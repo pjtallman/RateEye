@@ -1,2 +1,7 @@
 2026-03-16 13:35:11,531 - INFO - Starting RateEye Server...
 2026-03-16 13:35:21,126 - INFO - Landing page accessed
+2026-03-16 13:46:54,759 - Form data requires "python-multipart" to be installed. 
+You can install "python-multipart" with: 
+
+pip install python-multipart
+
