@@ -3,16 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>RateEye - Yield Tracker</title>
-    <style>
-        body { font-family: sans-serif; margin: 0; }
-        .navbar { background: #333; color: white; padding: 10px; display: flex; gap: 20px; }
-        .menu-item { cursor: pointer; position: relative; display: inline-block; }
-        .dropdown { display: none; position: absolute; background: #f9f9f9; color: black; min-width: 160px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1; }
-        .menu-item:hover .dropdown { display: block; }
-        .dropdown div { padding: 12px 16px; border-bottom: 1px solid #ddd; }
-        .dropdown div:hover { background-color: #f1f1f1; }
-        .content { padding: 50px; text-align: center; }
-    </style>
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
 
@@ -37,6 +28,7 @@
     </div>
     <div class="menu-item">Help
         <div class="dropdown">
+            <div onclick="window.open('/show-log', '_blank')">Show Log</div>
             <div>About</div>
         </div>
     </div>
