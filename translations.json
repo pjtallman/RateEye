@@ -1,0 +1,42 @@
+{
+    "en": {
+        "title": "RateEye - Yield Tracker",
+        "menu_file": "File",
+        "menu_edit": "Edit",
+        "menu_view": "View",
+        "menu_help": "Help",
+        "item_add": "Add Tickers",
+        "item_edit_tickers": "Edit Tickers",
+        "item_cut": "Cut",
+        "item_copy": "Copy",
+        "item_paste": "Paste",
+        "item_refresh": "Refresh",
+        "item_settings": "Settings",
+        "item_show_log": "Show Log",
+        "item_about": "About",
+        "heading_settings": "Settings",
+        "label_log_lines": "Lines to show for log:",
+        "btn_save": "Save Settings",
+        "btn_cancel": "Cancel"
+    },
+    "es": {
+        "title": "RateEye - Rastreador de Rendimiento",
+        "menu_file": "Archivo",
+        "menu_edit": "Editar",
+        "menu_view": "Ver",
+        "menu_help": "Ayuda",
+        "item_add": "Agregar Tickers",
+        "item_edit_tickers": "Editar Tickers",
+        "item_cut": "Cortar",
+        "item_copy": "Copiar",
+        "item_paste": "Pegar",
+        "item_refresh": "Actualizar",
+        "item_settings": "Configuración",
+        "item_show_log": "Ver Registro",
+        "item_about": "Acerca de",
+        "heading_settings": "Configuración",
+        "label_log_lines": "Líneas de registro a mostrar:",
+        "btn_save": "Guardar Cambios",
+        "btn_cancel": "Cancelar"
+    }
+}

@@ -1,44 +1,44 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>RateEye - Yield Tracker</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <title>{{ t.title }}</title>
 </head>
 <body>
+    <div class="menu-bar">
+        <div class="menu-item">{{ t.menu_file }}
+            <div class="dropdown">
+                <div>{{ t.item_add }}</div>
+                <div>{{ t.item_edit_tickers }}</div>
+                <div onclick="window.location.href='/settings'">{{ t.item_settings }}</div>
+            </div>
+        </div>
 
-<div class="navbar">
-    <div class="menu-item">File
-        <div class="dropdown">
-            <div>Add Tickers</div>
-            <div>Edit Tickers</div>
-            <div onclick="window.location.href='/settings'">Settings</div>
+        <div class="menu-item">{{ t.menu_edit }}
+            <div class="dropdown">
+                <div>{{ t.item_cut }}</div>
+                <div>{{ t.item_copy }}</div>
+                <div>{{ t.item_paste }}</div>
+            </div>
         </div>
-    </div>
-    <div class="menu-item">Edit
-        <div class="dropdown">
-            <div>Cut</div>
-            <div>Copy</div>
-            <div>Paste</div>
-        </div>
-    </div>
-    <div class="menu-item">View
-        <div class="dropdown">
-            <div>Current Rates</div>
-        </div>
-    </div>
-    <div class="menu-item">Help
-        <div class="dropdown">
-            <div onclick="window.open('/show-log', '_blank')">Show Log</div>
-            <div>About</div>
-        </div>
-    </div>
-</div>
 
-<div class="content">
-    <h1>Welcome to RateEye</h1>
-    <p>Your dashboard for Money Market and Bond Yields.</p>
-</div>
+        <div class="menu-item">{{ t.menu_view }}
+            <div class="dropdown">
+                <div onclick="location.reload()">{{ t.item_refresh }}</div>
+            </div>
+        </div>
 
+        <div class="menu-item">{{ t.menu_help }}
+            <div class="dropdown">
+                <div onclick="window.open('/show-log', '_blank')">{{ t.item_show_log }}</div>
+                <div>{{ t.item_about }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content">
+        <h1>{{ t.title }}</h1>
+        <p>Welcome to RateEye.</p>
+    </div>
 </body>
 </html>

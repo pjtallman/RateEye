@@ -2,17 +2,17 @@
 <html>
 <head>
     <link rel="stylesheet" href="/static/css/style.css">
-    <title>RateEye Settings</title>
+    <title>{{ t.item_settings }}</title>
 </head>
 <body>
     <div class="content">
-        <h1>Settings</h1>
+        <h1>{{ t.heading_settings }}</h1>
         <form action="/settings" method="post">
-            <label for="log_lines">Lines to show for log:</label>
+            <label for="log_lines">{{ t.label_log_lines }}</label>
             <input type="number" id="log_lines" name="log_lines" value="{{ line_count }}">
             <br><br>
-            <button type="submit">Save Settings</button>
-            <a href="/">Cancel</a>
+            <button type="submit">{{ t.btn_save }}</button>
+            <a href="/">{{ t.btn_cancel }}</a>
         </form>
     </div>
 </body>
