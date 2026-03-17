@@ -7,8 +7,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine, Column, String, Integer
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base  # Updated import
 
 # Local Imports
 from i18n import get_text
@@ -44,6 +43,8 @@ logger = logging.getLogger(__name__)
 DATABASE_URL = "sqlite:///./rateeye.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# FIXED: Modern SQLAlchemy 2.0 approach
 Base = declarative_base()
 
 
@@ -72,14 +73,10 @@ templates = Jinja2Templates(directory="templates")
 # --- 4. LOCALIZATION FILTERS ---
 def format_num(value, lang_code="en"):
     try:
+        formatted = "{:,.2f}".format(float(value))
         if lang_code and lang_code.startswith("es"):
-            return (
-                "{:,.2f}".format(float(value))
-                .replace(",", " ")
-                .replace(".", ",")
-                .replace(" ", ".")
-            )
-        return "{:,.2f}".format(float(value))
+            return formatted.replace(",", "X").replace(".", ",").replace("X", ".")
+        return formatted
     except (ValueError, TypeError):
         return value
 
@@ -92,7 +89,8 @@ templates.env.filters["format_num"] = format_num
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request, accept_language: str = Header(None)):
     t = get_text(accept_language)
-    return templates.TemplateResponse("index.html", {"request": request, "t": t})
+    # FIXED: TemplateResponse(request, name, context) is the new standard
+    return templates.TemplateResponse(request, "index.html", {"t": t})
 
 
 @app.get("/settings", response_class=HTMLResponse)
@@ -100,7 +98,7 @@ async def settings_page(request: Request, accept_language: str = Header(None)):
     t = get_text(accept_language)
     line_count = get_setting("log_lines", "100")
     return templates.TemplateResponse(
-        "settings.html", {"request": request, "t": t, "line_count": line_count}
+        request, "settings.html", {"t": t, "line_count": line_count}
     )
 
 
