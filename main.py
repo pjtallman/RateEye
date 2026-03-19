@@ -92,12 +92,14 @@ def format_num(value, lang_code="en"):
     ES: 1.234,56
     """
     try:
+
         formatted = "{:,.2f}".format(float(value))
         if lang_code and lang_code.startswith("es"):
             # Swap comma and dot using temporary placeholder 'X'
             return formatted.replace(",", "X").replace(".", ",").replace("X", ".")
         return formatted
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as e:
+        logger.error(f"Formatting error: {e}")
         return value
 
 
