@@ -15,8 +15,19 @@
             ],
             "subProcess": true,
             "jinja": true,
-            "justMyCode": false,
+            "justMyCode": true,
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Debug Unit Tests",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${file}"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
     ]
 }
