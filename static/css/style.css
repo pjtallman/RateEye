@@ -65,3 +65,96 @@ body {
     max-width: 800px;
     margin: 0 auto;
 }
+
+/* --- Login & Registration Styles --- */
+.login-container, .register-container {
+    width: 350px;
+    margin: 100px auto;
+    padding: 30px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background-color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.login-container h1, .register-container h1 {
+    text-align: center;
+    font-size: 1.6em;
+    margin-bottom: 25px;
+    color: #333;
+}
+
+.login-container label, .register-container label {
+    display: block;
+    margin-top: 15px;
+    font-weight: 500;
+    color: #555;
+}
+
+.login-container input, .register-container input {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.login-container button, .register-container button {
+    width: 100%;
+    padding: 12px;
+    margin-top: 25px;
+    background-color: #000000;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.login-container button:hover, .register-container button:hover {
+    background-color: #333333;
+}
+
+.login-container p, .register-container p {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 0.9em;
+    color: #666;
+}
+
+.login-container a, .register-container a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.login-container a:hover, .register-container a:hover {
+    text-decoration: underline;
+}
+
+.user-info {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    color: white;
+    font-size: 0.85em;
+}
+
+.user-info span {
+    margin-right: 15px;
+    opacity: 0.9;
+}
+
+.user-info a {
+    color: #ffcc00;
+    font-weight: 600;
+    text-decoration: none;
+    padding: 5px 10px;
+    border: 1px solid #ffcc00;
+    border-radius: 4px;
+}
+
+.user-info a:hover {
+    background-color: #ffcc00;
+    color: #000;
+}

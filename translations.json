@@ -17,7 +17,19 @@
         "heading_settings": "Settings",
         "label_log_lines": "Lines to show for log:",
         "btn_save": "Save Settings",
-        "btn_cancel": "Cancel"
+        "btn_cancel": "Cancel",
+        "nav_login": "Login",
+        "nav_register": "Register",
+        "nav_logout": "Logout",
+        "heading_login": "Login",
+        "heading_register": "Register New Account",
+        "label_email": "Email Address:",
+        "label_password": "Password:",
+        "btn_login": "Login",
+        "btn_register": "Create Account",
+        "label_remember_me": "Remember Me",
+        "msg_logged_in_as": "Logged in as:",
+        "link_forgot_password": "Forgot Password?"
     },
     "es": {
         "title": "RateEye - Rastreador de Rendimiento",
@@ -37,6 +49,18 @@
         "heading_settings": "Configuración",
         "label_log_lines": "Líneas de registro a mostrar:",
         "btn_save": "Guardar Cambios",
-        "btn_cancel": "Cancelar"
+        "btn_cancel": "Cancelar",
+        "nav_login": "Iniciar Sesión",
+        "nav_register": "Registrarse",
+        "nav_logout": "Cerrar Sesión",
+        "heading_login": "Iniciar Sesión",
+        "heading_register": "Registrar Nueva Cuenta",
+        "label_email": "Correo Electrónico:",
+        "label_password": "Contraseña:",
+        "btn_login": "Entrar",
+        "btn_register": "Crear Cuenta",
+        "label_remember_me": "Recuérdame",
+        "msg_logged_in_as": "Conectado como:",
+        "link_forgot_password": "¿Olvidó su contraseña?"
     }
 }

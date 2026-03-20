@@ -34,6 +34,16 @@
                 <div>{{ t.item_about }}</div>
             </div>
         </div>
+
+        <div class="user-info">
+            {% if user %}
+                <span>{{ t.msg_logged_in_as }} {{ user.email }}</span>
+                <a href="/logout">{{ t.nav_logout }}</a>
+            {% else %}
+                <a href="/login">{{ t.nav_login }}</a>
+                <a href="/register">{{ t.nav_register }}</a>
+            {% endif %}
+        </div>
     </div>
 
     <div class="content">

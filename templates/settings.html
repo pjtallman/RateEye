@@ -6,6 +6,12 @@
 </head>
 <body>
     <div class="content">
+        <div class="user-info">
+            {% if user %}
+                <span>{{ t.msg_logged_in_as }} {{ user.email }}</span>
+                <a href="/logout">{{ t.nav_logout }}</a>
+            {% endif %}
+        </div>
         <h1>{{ t.heading_settings }}</h1>
         <form action="/settings" method="post">
             <label for="log_lines">{{ t.label_log_lines }}</label>
