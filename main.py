@@ -26,7 +26,7 @@ from authlib.integrations.starlette_client import OAuth
 
 # Local Imports
 from i18n import get_text
-from database import User, UserSetting, SystemSetting, engine, SessionLocal, get_db, init_db, get_system_setting
+from database import User, UserSetting, SystemSetting, Role, user_roles, engine, SessionLocal, get_db, init_db, get_system_setting
 
 # --- 1. LOGGING & ENVIRONMENT SETUP ---
 LOG_DIR = "logs"
@@ -539,6 +539,88 @@ async def update_user(
     return RedirectResponse(url="/admin/users", status_code=303)
 
 
+@app.get("/admin/role")
+async def redirect_to_roles():
+    return RedirectResponse(url="/admin/roles", status_code=303)
+
+
+@app.get("/admin/roles", response_class=HTMLResponse)
+async def list_roles(
+    request: Request,
+    accept_language: str = Header(None),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    t = get_text(accept_language)
+    roles = db.query(Role).all()
+    # Also need users to add to roles
+    all_users = db.query(User).all()
+    return templates.TemplateResponse(request, "admin_roles.html", {
+        "t": t, 
+        "roles": roles, 
+        "user": user,
+        "all_users": all_users
+    })
+
+@app.post("/admin/roles/create")
+async def create_role(
+    name: str = Form(...),
+    description: str = Form(""),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    new_role = Role(name=name, description=description)
+    db.add(new_role)
+    db.commit()
+    logger.info(f"Role '{name}' created by {user.email}")
+    return RedirectResponse(url="/admin/roles", status_code=303)
+
+@app.post("/admin/roles/update/{role_id}")
+async def update_role(
+    role_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    user_ids: Optional[str] = Form(None), # Comma separated list of user IDs
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    role = db.query(Role).filter(Role.id == role_id).first()
+    if role:
+        role.name = name
+        role.description = description
+        
+        # Update associated users
+        if user_ids is not None:
+            # Clear current users and add new ones
+            role.users = []
+            if user_ids.strip():
+                id_list = [int(id_str) for id_str in user_ids.split(",") if id_str.strip()]
+                users_to_add = db.query(User).filter(User.id.in_(id_list)).all()
+                role.users.extend(users_to_add)
+        
+        db.commit()
+        logger.info(f"Role '{name}' updated by {user.email}")
+    
+    return RedirectResponse(url="/admin/roles", status_code=303)
+
+@app.post("/admin/roles/delete/{role_id}")
+async def delete_role(
+    role_id: int,
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    role = db.query(Role).filter(Role.id == role_id).first()
+    if role:
+        if role.name in ["Admin", "User"]:
+            # Prevent deleting system roles
+             return RedirectResponse(url="/admin/roles", status_code=303)
+        db.delete(role)
+        db.commit()
+        logger.info(f"Role '{role.name}' deleted by {user.email}")
+    
+    return RedirectResponse(url="/admin/roles", status_code=303)
+
+
 @app.post("/admin/users/delete/{user_id}")
 async def delete_user(
     user_id: int,
@@ -550,6 +632,8 @@ async def delete_user(
     
     target_user = db.query(User).filter(User.id == user_id).first()
     if target_user:
+        # Explicitly remove user from all roles first (though SQLAlchemy handles this)
+        target_user.roles = []
         db.delete(target_user)
         db.commit()
         logger.info(f"User {target_user.email} deleted by {user.email}")
@@ -560,4 +644,4 @@ async def delete_user(
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

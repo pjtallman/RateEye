@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 # Must set this before importing app or database
 os.environ["DATABASE_URL"] = "sqlite:///./test_rateeye.db"
 
-from database import Base, get_db, User, UserSetting, SystemSetting, pwd_context
+from database import Base, get_db, User, UserSetting, SystemSetting, Role, pwd_context, user_roles
 from main import app
 
 # Test database setup
@@ -25,7 +25,14 @@ def setup_database():
     db = TestingSessionLocal()
     if not db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first():
         db.add(SystemSetting(name="log_lines", value="100"))
-        db.commit()
+    
+    # Seed default roles for tests
+    if not db.query(Role).filter(Role.name == "Admin").first():
+        db.add(Role(name="Admin", description="Admin Role"))
+    if not db.query(Role).filter(Role.name == "User").first():
+        db.add(Role(name="User", description="User Role"))
+        
+    db.commit()
     db.close()
     
     yield
@@ -42,8 +49,9 @@ def db():
     session = TestingSessionLocal(bind=connection)
     
     # We want to start each test with a clean-ish database, 
-    # but we might want some basic setup.
-    # For now, let's just clear users to be sure.
+    # but keep the seeded roles.
+    # Clear users and user_roles, but keep Roles.
+    session.execute(user_roles.delete())
     session.query(User).delete()
     session.commit()
 
@@ -91,6 +99,10 @@ def test_admin(db):
         is_authorized=True,
         force_password_change=False
     )
+    # Give it admin role
+    admin_role = db.query(Role).filter(Role.name == "Admin").first()
+    user.roles.append(admin_role)
+    
     db.add(user)
     db.commit()
     db.refresh(user)
