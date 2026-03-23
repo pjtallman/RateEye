@@ -7,6 +7,13 @@
 <body>
     <div class="login-container">
         <h1>{{ t.heading_login }}</h1>
+        
+        {% if error %}
+        <div style="background-color: #fee; color: #c00; padding: 10px; border-radius: 4px; margin-bottom: 20px; text-align: center; border: 1px solid #fcc;">
+            {{ error }}
+        </div>
+        {% endif %}
+
         <form action="/login" method="post">
             <label>{{ t.label_email }}</label>
             <input type="email" name="email" required>

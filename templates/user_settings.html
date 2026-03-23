@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t.item_user_settings }}{% endblock %}
+
+{% block content %}
+    <h1>{{ t.heading_user_settings }}</h1>
+    
+    <div style="margin-top: 30px;">
+        <p>No user-specific settings available yet.</p>
+        <p><a href="/settings/user/change-username" class="btn">Change Username</a></p>
+        <p><a href="/settings/user/change-password" class="btn">Change Password</a></p>
+    </div>
+
+    <div style="margin-top: 20px;">
+        <a href="/" class="btn">{{ t.btn_cancel }}</a>
+    </div>
+{% endblock %}

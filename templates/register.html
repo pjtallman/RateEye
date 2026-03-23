@@ -7,7 +7,16 @@
 <body>
     <div class="register-container">
         <h1>{{ t.heading_register }}</h1>
+
+        {% if error %}
+        <div style="background-color: #fee; color: #c00; padding: 10px; border-radius: 4px; margin-bottom: 20px; text-align: center; border: 1px solid #fcc;">
+            {{ error }}
+        </div>
+        {% endif %}
+
         <form action="/register" method="post">
+            <label>Username:</label>
+            <input type="text" name="username" required>
             <label>{{ t.label_email }}</label>
             <input type="email" name="email" required>
             <label>{{ t.label_password }}</label>

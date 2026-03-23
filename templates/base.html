@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <title>{% block title %}{{ t.title }}{% endblock %}</title>
+</head>
+<body>
+    <div class="menu-bar">
+        <div class="menu-item">{{ t.menu_file }}
+            <div class="dropdown">
+                <div>{{ t.item_add }}</div>
+                <div>{{ t.item_edit_tickers }}</div>
+                <div onclick="window.location.href='/settings/user'">{{ t.item_user_settings }}</div>
+            </div>
+        </div>
+
+        <div class="menu-item">{{ t.menu_edit }}
+            <div class="dropdown">
+                <div>{{ t.item_cut }}</div>
+                <div>{{ t.item_copy }}</div>
+                <div>{{ t.item_paste }}</div>
+            </div>
+        </div>
+
+        <div class="menu-item">{{ t.menu_view }}
+            <div class="dropdown">
+                <div onclick="location.reload()">{{ t.item_refresh }}</div>
+            </div>
+        </div>
+
+        <div class="menu-item">Admin
+            <div class="dropdown">
+                <div onclick="window.location.href='/admin/users'">User Maintenance</div>
+                <div onclick="window.location.href='/settings/system'">{{ t.item_system_settings }}</div>
+                <div onclick="alert('Permissions management coming soon!')">Permissions</div>
+            </div>
+        </div>
+
+        <div class="menu-item">{{ t.menu_help }}
+            <div class="dropdown">
+                <div onclick="window.open('/show-log', '_blank')">{{ t.item_show_log }}</div>
+                <div>{{ t.item_about }}</div>
+            </div>
+        </div>
+
+        <div class="user-info">
+            {% if user %}
+                <span>{{ t.msg_logged_in_as }} {{ user.email }}</span>
+                <a href="/logout">{{ t.nav_logout }}</a>
+            {% else %}
+                <a href="/login">{{ t.nav_login }}</a>
+                <a href="/register">{{ t.nav_register }}</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="content">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t.item_system_settings }}{% endblock %}
+
+{% block content %}
+    <h1>{{ t.heading_system_settings }}</h1>
+    
+    <div style="margin-bottom: 30px;">
+        <form action="/settings/system" method="post">
+            <label for="log_lines">{{ t.label_log_lines }}</label>
+            <input type="number" id="log_lines" name="log_lines" value="{{ line_count }}">
+            <br><br>
+            <button type="submit">{{ t.btn_save }}</button>
+        </form>
+    </div>
+
+    <div style="margin-top: 20px;">
+        <a href="/" class="btn">{{ t.btn_cancel }}</a>
+    </div>
+{% endblock %}

@@ -1,68 +1,97 @@
-import pytest
-import logging
 import os
-import shutil
-from datetime import datetime
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from fastapi.testclient import TestClient
 
-# --- TEST LOG CONFIGURATION ---
-TEST_LOG_DIR = "logs"
-TEST_ACTIVE_LOG = os.path.join(TEST_LOG_DIR, "test_RateEye.log")
+# Must set this before importing app or database
+os.environ["DATABASE_URL"] = "sqlite:///./test_rateeye.db"
 
-# Global list to store results for the final summary
-session_results = []
+from database import Base, get_db, User, UserSetting, SystemSetting, pwd_context
+from main import app
 
-if not os.path.exists(TEST_LOG_DIR):
-    os.makedirs(TEST_LOG_DIR)
-
-
-def rotate_test_logs():
-    today_str = datetime.now().strftime("%Y%m%d")
-    archive_name = os.path.join(TEST_LOG_DIR, f"{today_str}_test_RateEye.log")
-    if os.path.exists(TEST_ACTIVE_LOG):
-        if not os.path.exists(archive_name):
-            shutil.copy(TEST_ACTIVE_LOG, archive_name)
-            with open(TEST_ACTIVE_LOG, "w") as f:
-                f.write(f"--- Test Log Rotated/Started at {datetime.now()} ---\n")
-
+# Test database setup
+TEST_DATABASE_URL = "sqlite:///./test_rateeye.db"
+engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 @pytest.fixture(scope="session", autouse=True)
-def setup_test_logging():
-    rotate_test_logs()
-
-    # Configure root logger for the test session
-    logger = logging.getLogger()
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-
-    file_handler = logging.FileHandler(TEST_ACTIVE_LOG)
-    file_handler.setFormatter(
-        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    )
-    logger.addHandler(file_handler)
-    logger.setLevel(logging.INFO)
-
-    logging.info("=" * 30 + " START TEST SESSION " + "=" * 30)
+def setup_database():
+    # Ensure we are using the test database
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    
+    # Initialize some system settings if needed
+    db = TestingSessionLocal()
+    if not db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first():
+        db.add(SystemSetting(name="log_lines", value="100"))
+        db.commit()
+    db.close()
+    
     yield
-    logging.info("=" * 30 + " END TEST SESSION " + "=" * 30)
+    
+    # Cleanup after all tests
+    Base.metadata.drop_all(bind=engine)
+    if os.path.exists("./test_rateeye.db"):
+        os.remove("./test_rateeye.db")
 
+@pytest.fixture
+def db():
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = TestingSessionLocal(bind=connection)
+    
+    # We want to start each test with a clean-ish database, 
+    # but we might want some basic setup.
+    # For now, let's just clear users to be sure.
+    session.query(User).delete()
+    session.commit()
 
-def pytest_runtest_logreport(report):
-    """Hooks into pytest to log PASSED/FAILED for each test stage."""
-    if report.when == "call":
-        status = report.outcome.upper()
-        test_name = report.nodeid
-        # Log the result immediately to the file
-        logging.info(f"TEST RESULT: {test_name} -> {status}")
-        # Save for the final summary
-        session_results.append((test_name, status))
+    yield session
+    
+    session.close()
+    transaction.rollback()
+    connection.close()
 
+@pytest.fixture
+def client(db):
+    def override_get_db():
+        try:
+            yield db
+        finally:
+            pass # Session is managed by the fixture
 
-def pytest_sessionfinish(session, exitstatus):
-    """Writes the final summary table to the log file at the end."""
-    with open(TEST_ACTIVE_LOG, "a") as f:
-        f.write("\n" + "=" * 32 + " Test Results " + "=" * 32 + "\n")
-        f.write(f"{'Test Name':<60} | {'Status':<10}\n")
-        f.write("-" * 78 + "\n")
-        for name, status in session_results:
-            f.write(f"{name:<60} | {status:<10}\n")
-        f.write("=" * 78 + "\n\n")
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+@pytest.fixture
+def test_user(db):
+    hashed_pwd = pwd_context.hash("testpassword")
+    user = User(
+        username="testuser",
+        email="test@example.com",
+        hashed_password=hashed_pwd,
+        is_authorized=True,
+        force_password_change=False
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+@pytest.fixture
+def test_admin(db):
+    hashed_pwd = pwd_context.hash("adminpassword")
+    user = User(
+        username="adminuser",
+        email="admin@example.com",
+        hashed_password=hashed_pwd,
+        is_authorized=True,
+        force_password_change=False
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user

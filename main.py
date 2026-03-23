@@ -4,23 +4,6 @@ import shutil
 import json
 from datetime import datetime
 from typing import Optional
-from fastapi import FastAPI, Request, Form, Header, Depends, HTTPException, status
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from sqlalchemy import create_engine, Column, String, Integer, Boolean, Text
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
-from starlette.middleware.sessions import SessionMiddleware
-from passlib.context import CryptContext
-from authlib.integrations.starlette_client import OAuth
-
-# Local Imports
-from i18n import get_text
-
-# --- 1. LOGGING & ENVIRONMENT SETUP ---
-LOG_DIR = "logs"
-ACTIVE_LOG = os.path.join(LOG_DIR, "RateEye.log")
-SECRET_KEY = os.environ.get("SECRET_KEY", "a-very-secret-key-for-development")
 
 # Check if we are running in a test environment
 IS_TESTING = (
@@ -28,8 +11,26 @@ IS_TESTING = (
     or "PYTEST_VERSION" in os.environ
 )
 
-if not os.path.exists(LOG_DIR):
-    os.makedirs(LOG_DIR)
+SECRET_KEY = os.environ.get("SECRET_KEY", "a-very-secret-key-for-development")
+if IS_TESTING:
+    SECRET_KEY = "a-very-secret-key-for-development"
+
+from fastapi import FastAPI, Request, Form, Header, Depends, HTTPException, status
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import Session
+from starlette.middleware.sessions import SessionMiddleware
+from passlib.context import CryptContext
+from authlib.integrations.starlette_client import OAuth
+
+# Local Imports
+from i18n import get_text
+from database import User, UserSetting, SystemSetting, engine, SessionLocal, get_db, init_db, get_system_setting
+
+# --- 1. LOGGING & ENVIRONMENT SETUP ---
+LOG_DIR = "logs"
+ACTIVE_LOG = os.path.join(LOG_DIR, "RateEye.log")
 
 
 def rotate_logs():
@@ -54,56 +55,22 @@ if not IS_TESTING:
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[logging.FileHandler(ACTIVE_LOG), logging.StreamHandler()],
     )
+else:
+    # During tests, conftest handles most logging, but let's ensure this logger can output
+    logging.getLogger(__name__).setLevel(logging.DEBUG)
 
 logger = logging.getLogger(__name__)
 
-# --- 2. DATABASE SETUP ---
-DATABASE_URL = "sqlite:///./rateeye.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
-
-
-class Setting(Base):
-    __tablename__ = "settings"
-    name = Column(String, primary_key=True, index=True)
-    value = Column(String)
-
-
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String, nullable=True)
-    is_authorized = Column(Boolean, default=False)
-    provider = Column(String, default="local")
-    profile_json = Column(Text, nullable=True)
-
-
-Base.metadata.create_all(bind=engine)
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def get_setting(name: str, default: str):
-    db = SessionLocal()
-    res = db.query(Setting).filter(Setting.name == name).first()
-    db.close()
-    return res.value if res else default
-
+# Initialize database
+init_db()
 
 # --- 3. AUTH & SECURITY SETUP ---
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def verify_password(plain_password, hashed_password):
+    if not hashed_password:
+        return False
     return pwd_context.verify(plain_password, hashed_password)
 
 
@@ -112,8 +79,10 @@ def get_password_hash(password):
 
 
 async def get_current_user(request: Request, db: Session = Depends(get_db)):
+    logger.debug(f"Session content: {dict(request.session)}")
     user_id = request.session.get("user_id")
     if not user_id:
+        logger.debug("No user_id in session")
         return None
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -130,6 +99,10 @@ def login_required(user: Optional[User] = Depends(get_current_user)):
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Cookie"},
         )
+    # Ensure user is authorized
+    if not user.is_authorized:
+        logger.warning(f"User {user.email} is not authorized.")
+        raise HTTPException(status_code=403, detail="User not authorized")
     return user
 
 
@@ -172,6 +145,11 @@ async def read_root(
     if not user:
         logger.info("Unauthenticated user at root. Redirecting to /login.")
         return RedirectResponse(url="/login", status_code=303)
+    
+    if user.force_password_change:
+        logger.info(f"User {user.email} must change password. Redirecting to /change-password.")
+        return RedirectResponse(url="/change-password", status_code=303)
+
     t = get_text(accept_language)
     logger.info(f"Authenticated user {user.email} at root. Rendering home page.")
     return templates.TemplateResponse(request, "index.html", {"t": t, "user": user})
@@ -185,18 +163,30 @@ async def register_page(request: Request, accept_language: str = Header(None)):
 
 @app.post("/register")
 async def register_user(
+    request: Request,
+    username: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
+    accept_language: str = Header(None),
     db: Session = Depends(get_db),
 ):
-    db_user = db.query(User).filter(User.email == email).first()
-    if db_user:
-        return "Email already registered"  # Simplified for now
+    # Check if username exists
+    if db.query(User).filter(User.username == username).first():
+        t = get_text(accept_language)
+        return templates.TemplateResponse(
+            request, "register.html", {"t": t, "error": "Username already taken"}
+        )
+    # Check if email exists
+    if db.query(User).filter(User.email == email).first():
+        t = get_text(accept_language)
+        return templates.TemplateResponse(
+            request, "register.html", {"t": t, "error": "Email already registered"}
+        )
     hashed_password = get_password_hash(password)
-    new_user = User(email=email, hashed_password=hashed_password)
+    new_user = User(username=username, email=email, hashed_password=hashed_password, is_authorized=True)
     db.add(new_user)
     db.commit()
-    logger.info(f"New user registered: {email}")
+    logger.info(f"New user registered: {username} ({email})")
     return RedirectResponse(url="/login", status_code=303)
 
 
@@ -213,9 +203,9 @@ async def forgot_password(email: str = Form(...)):
 
 
 @app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request, accept_language: str = Header(None)):
+async def login_page(request: Request, accept_language: str = Header(None), error: str = None):
     t = get_text(accept_language)
-    return templates.TemplateResponse(request, "login.html", {"t": t})
+    return templates.TemplateResponse(request, "login.html", {"t": t, "error": error})
 
 
 @app.post("/login")
@@ -224,15 +214,25 @@ async def login(
     email: str = Form(...),
     password: str = Form(...),
     remember_me: bool = Form(False),
+    accept_language: str = Header(None),
     db: Session = Depends(get_db),
 ):
-    user = db.query(User).filter(User.email == email).first()
+    # Try to find by email or username
+    user = db.query(User).filter((User.email == email) | (User.username == email)).first()
     if not user or not verify_password(password, user.hashed_password):
-        return "Invalid email or password"  # Simplified for now
+        t = get_text(accept_language)
+        return templates.TemplateResponse(
+            request, "login.html", {"t": t, "error": "Invalid email/username or password"}
+        )
     request.session["user_id"] = user.id
-    # Note: max_age is handled by middleware, but we could use remember_me 
-    # logic here if we had dynamic max_age support.
-    logger.info(f"User logged in: {email} (remember_me={remember_me})")
+    logger.info("Login successful. Setting session.")
+    db.commit() # Ensure session or changes are saved
+    logger.info(f"User logged in: {user.email} (ID: {user.id}, Session: {dict(request.session)})")
+    
+    if user.force_password_change:
+        logger.info(f"User {user.email} must change password. Redirecting to /change-password.")
+        return RedirectResponse(url="/change-password", status_code=303)
+    
     return RedirectResponse(url="/", status_code=303)
 
 
@@ -243,39 +243,126 @@ async def logout(request: Request):
     return RedirectResponse(url="/", status_code=303)
 
 
-@app.get("/settings", response_class=HTMLResponse)
-async def settings_page(
+@app.get("/settings/user", response_class=HTMLResponse)
+async def user_settings_page(
+    request: Request,
+    accept_language: str = Header(None),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db),
+):
+    t = get_text(accept_language)
+    logger.info(f"User settings page accessed by {user.email}.")
+    return templates.TemplateResponse(
+        request, "user_settings.html", {"t": t, "user": user}
+    )
+
+
+@app.get("/settings/user/change-username", response_class=HTMLResponse)
+async def user_change_username_page(
     request: Request,
     accept_language: str = Header(None),
     user: User = Depends(login_required),
 ):
     t = get_text(accept_language)
-    line_count = get_setting("log_lines", "100")
-    logger.info("Settings page accessed.")
+    return templates.TemplateResponse(request, "user_change_username.html", {"t": t, "user": user})
+
+
+@app.post("/settings/user/change-username")
+async def user_change_username(
+    request: Request,
+    new_username: str = Form(...),
+    accept_language: str = Header(None),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db),
+):
+    # Check if username exists
+    if db.query(User).filter(User.username == new_username).first():
+        t = get_text(accept_language)
+        return templates.TemplateResponse(
+            request, "user_change_username.html", {"t": t, "user": user, "error": "Username already taken"}
+        )
+
+    old_username = user.username
+    user.username = new_username
+    db.commit()
+    logger.info(f"User {user.email} changed username from {old_username} to {new_username}")
+    return RedirectResponse(url="/settings/user", status_code=303)
+
+
+@app.get("/settings/user/change-password", response_class=HTMLResponse)
+async def user_change_password_page(
+    request: Request,
+    accept_language: str = Header(None),
+    user: User = Depends(login_required),
+):
+    t = get_text(accept_language)
+    return templates.TemplateResponse(request, "user_change_password.html", {"t": t, "user": user})
+
+
+@app.post("/settings/user/change-password")
+async def user_change_password(
+    request: Request,
+    current_password: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+    accept_language: str = Header(None),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(current_password, user.hashed_password):
+        t = get_text(accept_language)
+        return templates.TemplateResponse(
+            request, "user_change_password.html", {"t": t, "user": user, "error": "Current password is incorrect"}
+        )
+    
+    if new_password != confirm_password:
+        t = get_text(accept_language)
+        return templates.TemplateResponse(
+            request, "user_change_password.html", {"t": t, "user": user, "error": "New passwords do not match"}
+        )
+    
+    user.hashed_password = get_password_hash(new_password)
+    db.commit()
+    logger.info(f"User {user.email} changed their password voluntarily.")
+    return RedirectResponse(url="/settings/user", status_code=303)
+
+
+@app.get("/settings/system", response_class=HTMLResponse)
+async def system_settings_page(
+    request: Request,
+    accept_language: str = Header(None),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db),
+):
+    # Future: check for admin permissions here
+    t = get_text(accept_language)
+    line_count = get_system_setting(db, "log_lines", "100")
+    logger.info(f"System settings page accessed by {user.email}.")
     return templates.TemplateResponse(
-        request, "settings.html", {"t": t, "line_count": line_count, "user": user}
+        request, "system_settings.html", {"t": t, "line_count": line_count, "user": user}
     )
 
 
-@app.post("/settings")
-async def save_settings(
-    log_lines: str = Form(...), user: User = Depends(login_required)
+@app.post("/settings/system")
+async def save_system_settings(
+    log_lines: str = Form(...), 
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
 ):
-    db = SessionLocal()
-    setting = db.query(Setting).filter(Setting.name == "log_lines").first()
+    # Future: check for admin permissions here
+    setting = db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first()
     if setting:
         setting.value = log_lines
     else:
-        db.add(Setting(name="log_lines", value=log_lines))
+        db.add(SystemSetting(name="log_lines", value=log_lines))
     db.commit()
-    db.close()
-    logger.info(f"Settings saved. New log_lines limit: {log_lines}")
-    return RedirectResponse(url="/", status_code=303)
+    logger.info(f"System settings saved by {user.email}. New log_lines limit: {log_lines}")
+    return RedirectResponse(url="/settings/system", status_code=303)
 
 
 @app.get("/show-log", response_class=PlainTextResponse)
-async def show_log(user: User = Depends(login_required)):
-    line_limit = int(get_setting("log_lines", "100"))
+async def show_log(user: User = Depends(login_required), db: Session = Depends(get_db)):
+    line_limit = int(get_system_setting(db, "log_lines", "100"))
     if os.path.exists(ACTIVE_LOG):
         with open(ACTIVE_LOG, "r") as f:
             lines = f.readlines()
@@ -299,9 +386,7 @@ oauth.register(
     client_id=os.environ.get("GITHUB_CLIENT_ID", "github-client-id"),
     client_secret=os.environ.get("GITHUB_CLIENT_SECRET", "github-client-secret"),
     access_token_url="https://github.com/login/oauth/access_token",
-    access_token_params=None,
     authorize_url="https://github.com/login/oauth/authorize",
-    authorize_params=None,
     api_base_url="https://api.github.com/",
     client_kwargs={"scope": "user:email"},
 )
@@ -310,12 +395,14 @@ oauth.register(
 @app.get("/auth/login/{provider}")
 async def auth_login(provider: str, request: Request):
     # Determine protocol based on request, handle local dev
-    scheme = "https" if request.url.scheme == "https" else "http"
-    redirect_uri = request.url_for("auth_callback", provider=provider)
-    # Force use of http for local development if not behind proxy
-    if "127.0.0.1" in str(redirect_uri) or "localhost" in str(redirect_uri):
-         redirect_uri = str(redirect_uri).replace("https://", "http://")
+    redirect_uri = str(request.url_for("auth_callback", provider=provider))
     
+    # Ensure redirect_uri uses https if the app is configured for it or if it's not localhost
+    if "127.0.0.1" not in redirect_uri and "localhost" not in redirect_uri:
+        if not redirect_uri.startswith("https://"):
+            redirect_uri = redirect_uri.replace("http://", "https://")
+    
+    logger.info(f"Redirecting to {provider} with redirect_uri: {redirect_uri}")
     return await oauth.create_client(provider).authorize_redirect(request, redirect_uri)
 
 
@@ -326,7 +413,7 @@ async def auth_callback(provider: str, request: Request, db: Session = Depends(g
         token = await client.authorize_access_token(request)
     except Exception as e:
         logger.error(f"OAuth error: {e}")
-        return RedirectResponse(url="/login")
+        return RedirectResponse(url="/login?error=OAuth+authentication+failed")
         
     user_data = token.get("userinfo")
     if not user_data:
@@ -344,18 +431,104 @@ async def auth_callback(provider: str, request: Request, db: Session = Depends(g
     user = db.query(User).filter(User.email == email).first()
     if not user:
         user = User(
+            username=email.split("@")[0], # Fallback username
             email=email,
             provider=provider,
             profile_json=json.dumps(user_data),
-            is_authorized=False,
+            is_authorized=True, # Assuming OAuth users are authorized
         )
         db.add(user)
         db.commit()
         db.refresh(user)
+    else:
+        # Update profile if it changed
+        user.profile_json = json.dumps(user_data)
+        db.commit()
 
     request.session["user_id"] = user.id
     logger.info(f"User logged in via {provider}: {email}")
     return RedirectResponse(url="/", status_code=303)
+
+
+@app.get("/change-password", response_class=HTMLResponse)
+async def change_password_page(
+    request: Request,
+    accept_language: str = Header(None),
+    user: User = Depends(login_required),
+):
+    t = get_text(accept_language)
+    return templates.TemplateResponse(request, "change_password.html", {"t": t, "user": user})
+
+
+@app.post("/change-password")
+async def change_password(
+    request: Request,
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+    accept_language: str = Header(None),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db),
+):
+    if new_password != confirm_password:
+        t = get_text(accept_language)
+        return templates.TemplateResponse(
+            request, "change_password.html", {"t": t, "user": user, "error": "Passwords do not match"}
+        )
+    
+    user.hashed_password = get_password_hash(new_password)
+    user.force_password_change = False
+    db.commit()
+    logger.info(f"Password changed for user: {user.email}")
+    return RedirectResponse(url="/", status_code=303)
+
+
+# --- 8. USER MANAGEMENT (CRUD) ---
+
+@app.get("/admin/users", response_class=HTMLResponse)
+async def list_users(
+    request: Request,
+    accept_language: str = Header(None),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    # In a real app, you'd check if user is an admin
+    t = get_text(accept_language)
+    users = db.query(User).all()
+    return templates.TemplateResponse(request, "admin_users.html", {"t": t, "users": users, "user": user})
+
+
+@app.post("/admin/users/force-password-change/{user_id}")
+async def admin_force_password_change(
+    user_id: int,
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if target_user:
+        target_user.force_password_change = not target_user.force_password_change
+        db.commit()
+        status_msg = "forced" if target_user.force_password_change else "cleared"
+        logger.info(f"Password change {status_msg} for user {target_user.email} by {user.email}")
+    
+    return RedirectResponse(url="/admin/users", status_code=303)
+
+
+@app.post("/admin/users/delete/{user_id}")
+async def delete_user(
+    user_id: int,
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    if user.id == user_id:
+         raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if target_user:
+        db.delete(target_user)
+        db.commit()
+        logger.info(f"User {target_user.email} deleted by {user.email}")
+    
+    return RedirectResponse(url="/admin/users", status_code=303)
 
 
 if __name__ == "__main__":
