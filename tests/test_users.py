@@ -102,6 +102,58 @@ def test_admin_delete_user(client, test_admin, test_user, db):
     deleted_user = db.query(User).filter(User.id == user_id).first()
     assert deleted_user is None
 
+def test_admin_update_user(client, test_admin, test_user, db):
+    # Log in as admin
+    client.post(
+        "/login",
+        data={"email": "admin@example.com", "password": "adminpassword"}
+    )
+    
+    # Update test_user
+    response = client.post(
+        f"/admin/users/update/{test_user.id}",
+        data={"email": "updated@example.com", "force_password_change": "true"},
+        follow_redirects=True
+    )
+    assert response.status_code == 200
+    
+    # Verify in DB
+    db.refresh(test_user)
+    assert test_user.email == "updated@example.com"
+    assert test_user.force_password_change is True
+
+def test_admin_update_user_email_taken(client, test_admin, test_user, db):
+    # Create another user to take an email
+    other_user = User(username="other", email="taken@example.com", hashed_password="hashed")
+    db.add(other_user)
+    db.commit()
+
+    client.post("/login", data={"email": "admin@example.com", "password": "adminpassword"})
+    
+    # Try to update test_user to the taken email
+    original_email = test_user.email
+    response = client.post(
+        f"/admin/users/update/{test_user.id}",
+        data={"email": "taken@example.com", "force_password_change": "false"},
+        follow_redirects=True
+    )
+    assert response.status_code == 200
+    
+    # Verify email did NOT change
+    db.refresh(test_user)
+    assert test_user.email == original_email
+
+def test_admin_update_non_existent_user(client, test_admin):
+    client.post("/login", data={"email": "admin@example.com", "password": "adminpassword"})
+    
+    # Try to update a user ID that doesn't exist
+    response = client.post(
+        "/admin/users/update/9999",
+        data={"email": "ghost@example.com", "force_password_change": "false"},
+        follow_redirects=True
+    )
+    assert response.status_code == 200 # Redirects back to list
+
 def test_admin_delete_self_fails(client, test_admin):
     # Log in as admin
     client.post(

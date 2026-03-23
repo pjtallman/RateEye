@@ -4,18 +4,72 @@
 
 {% block content %}
     <style>
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; cursor: pointer; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
         th { background-color: #f4f4f4; }
-        .delete-btn { color: #c00; cursor: pointer; border: none; background: none; font-weight: bold; }
-        .delete-btn:hover { text-decoration: underline; }
+        
+        .selected-row {
+            background-color: #e0f0ff !important;
+            outline: 2px solid #007bff;
+        }
+        
+        tr:hover:not(.selected-row) {
+            background-color: #f9f9f9;
+        }
+
+        .action-bar {
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .left-actions, .right-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-action {
+            padding: 8px 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            background-color: #f4f4f4;
+            border-radius: 4px;
+        }
+
+        .btn-action:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-delete { color: #c00; }
+        .btn-edit { color: #007bff; }
+        .btn-save { color: #28a745; border-color: #28a745; }
+        .btn-cancel { color: #6c757d; }
+
+        input[type="text"].edit-input {
+            width: 90%;
+            padding: 4px;
+        }
     </style>
 
     <h1>User Maintenance</h1>
 
     <p>Current User: <strong>{{ user.username or user.email }}</strong></p>
 
-    <table>
+    <div class="action-bar">
+        <div class="left-actions">
+            <button id="btn-edit" class="btn-action btn-edit" onclick="handleEdit()">Edit</button>
+            <button id="btn-delete" class="btn-action btn-delete" onclick="handleDeleteUser()">Delete</button>
+        </div>
+        <div class="right-actions">
+            <button id="btn-save" class="btn-action btn-save" disabled onclick="handleSave()">Save</button>
+            <button id="btn-cancel" class="btn-action btn-cancel" disabled onclick="handleCancel()">Cancel</button>
+        </div>
+    </div>
+
+    <table id="user-table">
         <thead>
             <tr>
                 <th>ID</th>
@@ -23,34 +77,159 @@
                 <th>Email</th>
                 <th>Provider</th>
                 <th>Force Password Change</th>
-                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             {% for u in users %}
-            <tr>
+            <tr id="row-{{ u.id }}" data-user-id="{{ u.id }}" data-is-self="{{ 'true' if u.id == user.id else 'false' }}" onclick="selectRow(this)">
                 <td>{{ u.id }}</td>
                 <td>{{ u.username or u.email.split('@')[0] }}</td>
-                <td>{{ u.email }}</td>
+                <td class="col-email" data-original="{{ u.email }}">{{ u.email }}</td>
                 <td>{{ u.provider }}</td>
-                <td>{{ "Yes" if u.force_password_change else "No" }}</td>
-                <td>
-                    <form action="/admin/users/force-password-change/{{ u.id }}" method="post" style="display:inline;">
-                        <button type="submit" style="color: #007bff; border: none; background: none; font-weight: bold; cursor: pointer;">
-                            Force Password Change
-                        </button>
-                    </form>
-                    {% if u.id != user.id %}
-                    |
-                    <form action="/admin/users/delete/{{ u.id }}" method="post" onsubmit="return confirm('Are you sure you want to delete this user?');" style="display:inline;">
-                        <button type="submit" class="delete-btn">Delete</button>
-                    </form>
-                    {% else %}
-                    (Current User)
-                    {% endif %}
-                </td>
+                <td class="col-force-pw" data-original="{{ 'true' if u.force_password_change else 'false' }}">{{ "Yes" if u.force_password_change else "No" }}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+
+    <!-- Hidden form for Save/Delete -->
+    <form id="action-form" method="post" style="display:none;">
+        <input type="hidden" name="email" id="form-email">
+        <input type="hidden" name="force_password_change" id="form-force-pw">
+    </form>
+
+    <script>
+        let selectedRow = null;
+        let isEditing = false;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Select first row on load
+            const firstRow = document.querySelector('#user-table tbody tr');
+            if (firstRow) selectRow(firstRow);
+        });
+
+        function selectRow(row) {
+            if (selectedRow === row) return; // Already selected, do nothing
+
+            if (isEditing) {
+                // If switching rows while editing, cancel edits on the current row
+                cancelEdit(selectedRow);
+                isEditing = false;
+            }
+
+            if (selectedRow) selectedRow.classList.remove('selected-row');
+            
+            selectedRow = row;
+            selectedRow.classList.add('selected-row');
+            
+            updateButtonStates();
+        }
+
+        function updateButtonStates() {
+            const isSelf = selectedRow.getAttribute('data-is-self') === 'true';
+            document.getElementById('btn-delete').disabled = isEditing || isSelf;
+            document.getElementById('btn-edit').disabled = isEditing;
+            
+            // Save and Cancel are enabled only if there are changes
+            checkChanges();
+        }
+
+        function handleEdit() {
+            if (!selectedRow) return;
+            isEditing = true;
+            
+            const emailCell = selectedRow.querySelector('.col-email');
+            const forcePwCell = selectedRow.querySelector('.col-force-pw');
+            
+            const originalEmail = emailCell.getAttribute('data-original');
+            const originalForcePw = forcePwCell.getAttribute('data-original') === 'true';
+            
+            emailCell.innerHTML = `<input type="text" class="edit-input" value="${originalEmail}" oninput="checkChanges()">`;
+            forcePwCell.innerHTML = `<input type="checkbox" ${originalForcePw ? 'checked' : ''} onchange="checkChanges()">`;
+            
+            updateButtonStates();
+        }
+
+        function checkChanges() {
+            if (!isEditing) {
+                document.getElementById('btn-save').disabled = true;
+                document.getElementById('btn-cancel').disabled = true;
+                return;
+            }
+
+            const emailInput = selectedRow.querySelector('.col-email input');
+            const forcePwInput = selectedRow.querySelector('.col-force-pw input');
+            
+            const currentEmail = emailInput.value;
+            const currentForcePw = forcePwInput.checked;
+            
+            const originalEmail = selectedRow.querySelector('.col-email').getAttribute('data-original');
+            const originalForcePw = selectedRow.querySelector('.col-force-pw').getAttribute('data-original') === 'true';
+            
+            const changed = (currentEmail !== originalEmail) || (currentForcePw !== originalForcePw);
+            
+            document.getElementById('btn-save').disabled = !changed;
+            document.getElementById('btn-cancel').disabled = false; // Cancel is always enabled in edit mode
+        }
+
+        function handleCancel() {
+            if (!selectedRow || !isEditing) return;
+            cancelEdit(selectedRow);
+            isEditing = false;
+            updateButtonStates();
+        }
+
+        function cancelEdit(row) {
+            const emailCell = row.querySelector('.col-email');
+            const forcePwCell = row.querySelector('.col-force-pw');
+            
+            const originalEmail = emailCell.getAttribute('data-original');
+            const originalForcePw = forcePwCell.getAttribute('data-original') === 'true';
+            
+            emailCell.textContent = originalEmail;
+            forcePwCell.textContent = originalForcePw ? 'Yes' : 'No';
+        }
+
+        function handleSave() {
+            if (!selectedRow || !isEditing) return;
+            
+            const userId = selectedRow.getAttribute('data-user-id');
+            const email = selectedRow.querySelector('.col-email input').value;
+            const forcePw = selectedRow.querySelector('.col-force-pw input').checked;
+            
+            const form = document.getElementById('action-form');
+            form.action = `/admin/users/update/${userId}`;
+            document.getElementById('form-email').value = email;
+            document.getElementById('form-force-pw').value = forcePw ? 'on' : ''; // FastAPI Form checkbox handling
+            
+            // To properly handle the boolean in FastAPI Form(False) with 'on'
+            // We need to ensure it's sent correctly. FastAPI expects 'true', 'on', '1' etc.
+            // If the checkbox is NOT checked, the value is not sent usually, but here we use a hidden input.
+            // Actually, for a Form(...) with default False, if we don't send it, it will be False.
+            
+            if (!forcePw) {
+                // Remove from form if false to let it default to False in backend
+                document.getElementById('form-force-pw').name = ""; 
+            } else {
+                document.getElementById('form-force-pw').name = "force_password_change";
+                document.getElementById('form-force-pw').value = "true";
+            }
+
+            form.submit();
+        }
+
+        function handleDeleteUser() {
+            if (!selectedRow || isEditing) return;
+            const userId = selectedRow.getAttribute('data-user-id');
+            const isSelf = selectedRow.getAttribute('data-is-self') === 'true';
+            
+            if (isSelf) return;
+            
+            if (confirm('Are you sure you want to delete this user?')) {
+                const form = document.getElementById('action-form');
+                form.action = `/admin/users/delete/${userId}`;
+                form.submit();
+            }
+        }
+    </script>
 {% endblock %}

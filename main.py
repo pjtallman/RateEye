@@ -513,6 +513,32 @@ async def admin_force_password_change(
     return RedirectResponse(url="/admin/users", status_code=303)
 
 
+@app.post("/admin/users/update/{user_id}")
+async def update_user(
+    user_id: int,
+    email: str = Form(...),
+    force_password_change: bool = Form(False),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    # Future: check for admin permissions
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if target_user:
+        # Check if email is already taken by another user
+        existing_user = db.query(User).filter(User.email == email, User.id != user_id).first()
+        if existing_user:
+             # In a real app, we might want to return an error message to the UI
+             logger.warning(f"Admin {user.email} tried to change user {user_id} email to already taken {email}")
+             return RedirectResponse(url="/admin/users", status_code=303)
+             
+        target_user.email = email
+        target_user.force_password_change = force_password_change
+        db.commit()
+        logger.info(f"User {target_user.username} updated by {user.email}: email={email}, force_password_change={force_password_change}")
+    
+    return RedirectResponse(url="/admin/users", status_code=303)
+
+
 @app.post("/admin/users/delete/{user_id}")
 async def delete_user(
     user_id: int,
