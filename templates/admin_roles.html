@@ -51,13 +51,13 @@
 
     <div class="action-bar">
         <div class="left-actions">
-            <button id="btn-new" class="btn-action btn-add" onclick="handleNew()">New Role</button>
-            <button id="btn-edit" class="btn-action btn-edit" onclick="handleEdit()">Edit</button>
-            <button id="btn-delete" class="btn-action btn-delete" onclick="handleDeleteRole()">Delete</button>
+            <button id="btn-new" class="btn-action btn-add">New Role</button>
+            <button id="btn-edit" class="btn-action btn-edit">Edit</button>
+            <button id="btn-delete" class="btn-action btn-delete">Delete</button>
         </div>
         <div class="right-actions">
-            <button id="btn-save" class="btn-action btn-save" disabled onclick="handleSave()">Save</button>
-            <button id="btn-cancel" class="btn-action btn-cancel" disabled onclick="handleCancel()">Cancel</button>
+            <button id="btn-save" class="btn-action btn-save" disabled>Save</button>
+            <button id="btn-cancel" class="btn-action btn-cancel" disabled>Cancel</button>
         </div>
     </div>
 
@@ -76,8 +76,7 @@
                 data-role-id="{{ r.id }}" 
                 data-role-name="{{ r.name }}" 
                 data-role-desc="{{ r.description }}"
-                data-role-users="{{ r.users | map(attribute='id') | list | join(',') }}"
-                onclick="selectRole(this)">
+                data-role-users="{{ r.users | map(attribute='id') | list | join(',') }}">
                 <td>{{ r.id }}</td>
                 <td class="col-name" data-original="{{ r.name }}">{{ r.name }}</td>
                 <td class="col-desc" data-original="{{ r.description }}">{{ r.description }}</td>
@@ -89,13 +88,13 @@
     <div id="child-container" class="child-table-container">
         <div class="section-header">Assigned Users</div>
         <div class="child-actions">
-            <select id="user-selector" class="edit-input" style="width: 250px;" onchange="checkAddUserBtn()">
+            <select id="user-selector" class="edit-input" style="width: 250px;">
                 <option value="">-- Select User to Add --</option>
                 {% for u in all_users %}
                 <option value="{{ u.id }}">{{ u.username }} ({{ u.email }})</option>
                 {% endfor %}
             </select>
-            <button id="btn-add-user" class="btn-action btn-add" disabled onclick="addUserToRole()">Add User</button>
+            <button id="btn-add-user" class="btn-action btn-add" disabled>Add User</button>
         </div>
         <table id="assigned-users-table">
             <thead>
@@ -118,217 +117,9 @@
         <input type="hidden" name="user_ids" id="form-user-ids">
     </form>
 
-    <script>
-        const allUsers = {
-            {% for u in all_users %}
-            "{{ u.id }}": { "id": "{{ u.id }}", "username": "{{ u.username }}", "email": "{{ u.email }}" },
-            {% endfor %}
-        };
+    <div id="all-users-data" style="display:none;" 
+         data-users='{ {% for u in all_users %}"{{ u.id }}": {"id": {{ u.id }}, "username": "{{ u.username }}", "email": "{{ u.email }}"}{% if not loop.last %},{% endif %}{% endfor %} }'>
+    </div>
 
-        let selectedRoleRow = null;
-        let isEditing = false;
-        let isNew = false;
-        let currentAssignedUserIds = [];
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const firstRow = document.querySelector('#roles-table tbody tr');
-            if (firstRow) selectRole(firstRow);
-        });
-
-        function selectRole(row) {
-            if (isEditing || isNew) {
-                if (selectedRoleRow === row) return;
-                if (!confirm("Discard unsaved changes?")) return;
-                cancelEdit();
-            }
-
-            if (selectedRoleRow) selectedRoleRow.classList.remove('selected-row');
-            selectedRoleRow = row;
-            selectedRoleRow.classList.add('selected-row');
-
-            const userIdsStr = row.getAttribute('data-role-users');
-            currentAssignedUserIds = userIdsStr ? userIdsStr.split(',').filter(s => s).map(Number) : [];
-            
-            updateUI();
-        }
-
-        function updateUI() {
-            const isSystemRole = selectedRoleRow && (["Admin", "User"].includes(selectedRoleRow.getAttribute('data-role-name')));
-            
-            document.getElementById('btn-edit').disabled = !selectedRoleRow || isEditing || isNew;
-            document.getElementById('btn-delete').disabled = !selectedRoleRow || isEditing || isNew || isSystemRole;
-            document.getElementById('btn-new').disabled = isEditing || isNew;
-            
-            renderAssignedUsers();
-            
-            // Child actions enabled only in edit mode
-            document.getElementById('user-selector').disabled = !(isEditing || isNew);
-            checkAddUserBtn();
-            
-            checkChanges();
-        }
-
-        function checkAddUserBtn() {
-            const selector = document.getElementById('user-selector');
-            const btn = document.getElementById('btn-add-user');
-            btn.disabled = !(isEditing || isNew) || !selector.value;
-        }
-
-        function renderAssignedUsers() {
-            const tbody = document.querySelector('#assigned-users-table tbody');
-            tbody.innerHTML = '';
-            
-            currentAssignedUserIds.forEach(id => {
-                const u = allUsers[id];
-                if (!u) return;
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${u.id}</td>
-                    <td>${u.username}</td>
-                    <td>${u.email}</td>
-                    <td>
-                        <button class="remove-btn" onclick="removeUserFromRole(${id})" ${!(isEditing || isNew) ? 'disabled style="opacity:0.3"' : ''}>Remove</button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function handleNew() {
-            isNew = true;
-            isEditing = false;
-            if (selectedRoleRow) selectedRoleRow.classList.remove('selected-row');
-            selectedRoleRow = null;
-            currentAssignedUserIds = [];
-            
-            // Add a temporary row at top
-            const tbody = document.querySelector('#roles-table tbody');
-            const tr = document.createElement('tr');
-            tr.id = 'temp-row';
-            tr.innerHTML = `
-                <td>(new)</td>
-                <td class="col-name"><input type="text" class="edit-input" placeholder="Role Name" oninput="checkChanges()"></td>
-                <td class="col-desc"><input type="text" class="edit-input" placeholder="Description" oninput="checkChanges()"></td>
-            `;
-            tbody.prepend(tr);
-            
-            updateUI();
-        }
-
-        function handleEdit() {
-            if (!selectedRoleRow) return;
-            isEditing = true;
-            
-            const nameCell = selectedRoleRow.querySelector('.col-name');
-            const descCell = selectedRoleRow.querySelector('.col-desc');
-            
-            nameCell.innerHTML = `<input type="text" class="edit-input" value="${nameCell.getAttribute('data-original')}" oninput="checkChanges()">`;
-            descCell.innerHTML = `<input type="text" class="edit-input" value="${descCell.getAttribute('data-original')}" oninput="checkChanges()">`;
-            
-            updateUI();
-        }
-
-        function cancelEdit() {
-            if (isNew) {
-                const temp = document.getElementById('temp-row');
-                if (temp) temp.remove();
-                isNew = false;
-                // Re-select first existing row if any
-                const firstRow = document.querySelector('#roles-table tbody tr');
-                if (firstRow) selectRole(firstRow);
-            } else if (isEditing && selectedRoleRow) {
-                const nameCell = selectedRoleRow.querySelector('.col-name');
-                const descCell = selectedRoleRow.querySelector('.col-desc');
-                nameCell.textContent = nameCell.getAttribute('data-original');
-                descCell.textContent = descCell.getAttribute('data-original');
-                
-                // Restore users from attributes
-                const userIdsStr = selectedRoleRow.getAttribute('data-role-users');
-                currentAssignedUserIds = userIdsStr ? userIdsStr.split(',').filter(s => s).map(Number) : [];
-                
-                isEditing = false;
-            }
-            updateUI();
-        }
-
-        function handleCancel() { cancelEdit(); }
-
-        function checkChanges() {
-            if (!(isEditing || isNew)) {
-                document.getElementById('btn-save').disabled = true;
-                document.getElementById('btn-cancel').disabled = true;
-                return;
-            }
-
-            let changed = isNew;
-            if (isEditing && selectedRoleRow) {
-                const nameInput = selectedRoleRow.querySelector('.col-name input');
-                const descInput = selectedRoleRow.querySelector('.col-desc input');
-                const originalName = selectedRoleRow.querySelector('.col-name').getAttribute('data-original');
-                const originalDesc = selectedRoleRow.querySelector('.col-desc').getAttribute('data-original');
-                const originalUserIdsStr = selectedRoleRow.getAttribute('data-role-users');
-                const originalUserIds = originalUserIdsStr ? originalUserIdsStr.split(',').sort().join(',') : '';
-                const currentUserIds = currentAssignedUserIds.slice().sort().join(',');
-                
-                changed = (nameInput.value !== originalName) || 
-                          (descInput.value !== originalDesc) || 
-                          (currentUserIds !== originalUserIds);
-            }
-            
-            document.getElementById('btn-save').disabled = !changed;
-            document.getElementById('btn-cancel').disabled = false;
-        }
-
-        function addUserToRole() {
-            const selector = document.getElementById('user-selector');
-            const userId = parseInt(selector.value);
-            if (!userId) return;
-            if (!currentAssignedUserIds.includes(userId)) {
-                currentAssignedUserIds.push(userId);
-                renderAssignedUsers();
-                checkChanges();
-            }
-            selector.value = '';
-        }
-
-        function removeUserFromRole(userId) {
-            currentAssignedUserIds = currentAssignedUserIds.filter(id => id !== userId);
-            renderAssignedUsers();
-            checkChanges();
-        }
-
-        function handleSave() {
-            const form = document.getElementById('role-form');
-            let name, desc;
-            
-            if (isNew) {
-                const temp = document.getElementById('temp-row');
-                name = temp.querySelector('.col-name input').value;
-                desc = temp.querySelector('.col-desc input').value;
-                form.action = '/admin/roles/create';
-            } else {
-                name = selectedRoleRow.querySelector('.col-name input').value;
-                desc = selectedRoleRow.querySelector('.col-desc input').value;
-                form.action = `/admin/roles/update/${selectedRoleRow.getAttribute('data-role-id')}`;
-            }
-            
-            document.getElementById('form-role-name').value = name;
-            document.getElementById('form-role-desc').value = desc;
-            document.getElementById('form-user-ids').value = currentAssignedUserIds.join(',');
-            
-            form.submit();
-        }
-
-        function handleDeleteRole() {
-            if (!selectedRoleRow || isEditing || isNew) return;
-            const roleId = selectedRoleRow.getAttribute('data-role-id');
-            const roleName = selectedRoleRow.getAttribute('data-role-name');
-            
-            if (confirm(`Are you sure you want to delete role '${roleName}'?`)) {
-                const form = document.getElementById('role-form');
-                form.action = `/admin/roles/delete/${roleId}`;
-                form.submit();
-            }
-        }
-    </script>
+    <script src="/static/js/admin_roles.js"></script>
 {% endblock %}
