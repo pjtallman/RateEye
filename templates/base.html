@@ -17,7 +17,7 @@
     <div class="menu-bar">
         <div class="menu-item">{{ t.menu_activities or 'Activities' }}
             <div class="dropdown">
-                <div>{{ t.item_securities or 'Securities' }}</div>
+                <div onclick="window.location.href='/admin/securities'">{{ t.item_securities or 'Securities' }}</div>
                 <div class="menu-separator"></div>
                 <div onclick="window.location.href='/settings/user'">{{ t.item_user_settings }}</div>
             </div>
@@ -32,7 +32,7 @@
         <div class="menu-item">{{ t.menu_admin or 'Admin' }}
             <div class="dropdown">
                 <div onclick="window.location.href='/admin/roles'">{{ t.item_roles or 'Roles' }}</div>
-                <div onclick="alert('Permissions management coming soon!')">{{ t.item_permissions or 'Permissions' }}</div>
+                <div onclick="window.location.href='/admin/permissions'">{{ t.item_permissions or 'Permissions' }}</div>
                 <div class="menu-separator"></div>
                 <div onclick="window.location.href='/admin/users'">{{ t.item_users or 'Users' }}</div>
                 <div class="menu-separator"></div>

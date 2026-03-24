@@ -4,6 +4,7 @@ import shutil
 import json
 from datetime import datetime
 from typing import Optional
+from enum import Enum
 
 # Check if we are running in a test environment
 IS_TESTING = (
@@ -32,6 +33,10 @@ from database import User, UserSetting, SystemSetting, Role, user_roles, engine,
 LOG_DIR = "logs"
 ACTIVE_LOG = os.path.join(LOG_DIR, "RateEye.log")
 
+class PageType(str, Enum):
+    MAINTENANCE = "Maintenance"
+    SETTINGS = "Settings"
+    INFO = "Info"
 
 def rotate_logs():
     """Rotates the production log file daily. Skipped during unit tests."""
@@ -136,7 +141,7 @@ templates.env.filters["format_num"] = format_num
 # --- 6. ROUTES ---
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse, tags=[PageType.INFO])
 async def read_root(
     request: Request,
     accept_language: str = Header(None),
@@ -155,13 +160,13 @@ async def read_root(
     return templates.TemplateResponse(request, "index.html", {"t": t, "user": user})
 
 
-@app.get("/register", response_class=HTMLResponse)
+@app.get("/register", response_class=HTMLResponse, tags=[PageType.INFO])
 async def register_page(request: Request, accept_language: str = Header(None)):
     t = get_text(accept_language)
     return templates.TemplateResponse(request, "register.html", {"t": t})
 
 
-@app.post("/register")
+@app.post("/register", tags=[PageType.INFO])
 async def register_user(
     request: Request,
     username: str = Form(...),
@@ -190,25 +195,25 @@ async def register_user(
     return RedirectResponse(url="/login", status_code=303)
 
 
-@app.get("/forgot-password", response_class=HTMLResponse)
+@app.get("/forgot-password", response_class=HTMLResponse, tags=[PageType.INFO])
 async def forgot_password_page(request: Request, accept_language: str = Header(None)):
     t = get_text(accept_language)
     return templates.TemplateResponse(request, "forgot_password.html", {"t": t})
 
 
-@app.post("/forgot-password")
+@app.post("/forgot-password", tags=[PageType.INFO])
 async def forgot_password(email: str = Form(...)):
     logger.info(f"Password reset requested for: {email}")
-    return "If an account exists with this email, you will receive a reset link shortly."
+    return HTMLResponse(content="<p>If an account exists with this email, you will receive a reset link shortly.</p><a href='/login'>Back to Login</a>")
 
 
-@app.get("/login", response_class=HTMLResponse)
+@app.get("/login", response_class=HTMLResponse, tags=[PageType.INFO])
 async def login_page(request: Request, accept_language: str = Header(None), error: str = None):
     t = get_text(accept_language)
     return templates.TemplateResponse(request, "login.html", {"t": t, "error": error})
 
 
-@app.post("/login")
+@app.post("/login", tags=[PageType.INFO])
 async def login(
     request: Request,
     email: str = Form(...),
@@ -236,14 +241,14 @@ async def login(
     return RedirectResponse(url="/", status_code=303)
 
 
-@app.get("/logout")
+@app.get("/logout", tags=[PageType.INFO])
 async def logout(request: Request):
     request.session.clear()
     logger.info("User logged out")
     return RedirectResponse(url="/", status_code=303)
 
 
-@app.get("/settings/user", response_class=HTMLResponse)
+@app.get("/settings/user", response_class=HTMLResponse, tags=[PageType.SETTINGS])
 async def user_settings_page(
     request: Request,
     accept_language: str = Header(None),
@@ -257,7 +262,7 @@ async def user_settings_page(
     )
 
 
-@app.get("/settings/user/change-username", response_class=HTMLResponse)
+@app.get("/settings/user/change-username", response_class=HTMLResponse, tags=[PageType.SETTINGS])
 async def user_change_username_page(
     request: Request,
     accept_language: str = Header(None),
@@ -267,7 +272,7 @@ async def user_change_username_page(
     return templates.TemplateResponse(request, "user_change_username.html", {"t": t, "user": user})
 
 
-@app.post("/settings/user/change-username")
+@app.post("/settings/user/change-username", tags=[PageType.SETTINGS])
 async def user_change_username(
     request: Request,
     new_username: str = Form(...),
@@ -289,7 +294,7 @@ async def user_change_username(
     return RedirectResponse(url="/settings/user", status_code=303)
 
 
-@app.get("/settings/user/change-password", response_class=HTMLResponse)
+@app.get("/settings/user/change-password", response_class=HTMLResponse, tags=[PageType.SETTINGS])
 async def user_change_password_page(
     request: Request,
     accept_language: str = Header(None),
@@ -299,7 +304,7 @@ async def user_change_password_page(
     return templates.TemplateResponse(request, "user_change_password.html", {"t": t, "user": user})
 
 
-@app.post("/settings/user/change-password")
+@app.post("/settings/user/change-password", tags=[PageType.SETTINGS])
 async def user_change_password(
     request: Request,
     current_password: str = Form(...),
@@ -327,7 +332,7 @@ async def user_change_password(
     return RedirectResponse(url="/settings/user", status_code=303)
 
 
-@app.get("/settings/system", response_class=HTMLResponse)
+@app.get("/settings/system", response_class=HTMLResponse, tags=[PageType.SETTINGS])
 async def system_settings_page(
     request: Request,
     accept_language: str = Header(None),
@@ -343,7 +348,7 @@ async def system_settings_page(
     )
 
 
-@app.post("/settings/system")
+@app.post("/settings/system", tags=[PageType.SETTINGS])
 async def save_system_settings(
     log_lines: str = Form(...), 
     user: User = Depends(login_required),
@@ -360,7 +365,7 @@ async def save_system_settings(
     return RedirectResponse(url="/settings/system", status_code=303)
 
 
-@app.get("/show-log", response_class=PlainTextResponse)
+@app.get("/show-log", response_class=PlainTextResponse, tags=[PageType.INFO])
 async def show_log(user: User = Depends(login_required), db: Session = Depends(get_db)):
     line_limit = int(get_system_setting(db, "log_lines", "100"))
     if os.path.exists(ACTIVE_LOG):
@@ -371,7 +376,7 @@ async def show_log(user: User = Depends(login_required), db: Session = Depends(g
     return "No log file found."
 
 
-@app.get("/about", response_class=HTMLResponse)
+@app.get("/about", response_class=HTMLResponse, tags=[PageType.INFO])
 async def about_page(request: Request, accept_language: str = Header(None)):
     t = get_text(accept_language)
     return templates.TemplateResponse(request, "about.html", {"t": t})
@@ -398,7 +403,7 @@ oauth.register(
 )
 
 
-@app.get("/auth/login/{provider}")
+@app.get("/auth/login/{provider}", tags=[PageType.INFO])
 async def auth_login(provider: str, request: Request):
     # Determine protocol based on request, handle local dev
     redirect_uri = str(request.url_for("auth_callback", provider=provider))
@@ -412,7 +417,7 @@ async def auth_login(provider: str, request: Request):
     return await oauth.create_client(provider).authorize_redirect(request, redirect_uri)
 
 
-@app.get("/auth/callback/{provider}")
+@app.get("/auth/callback/{provider}", tags=[PageType.INFO])
 async def auth_callback(provider: str, request: Request, db: Session = Depends(get_db)):
     client = oauth.create_client(provider)
     try:
@@ -456,7 +461,7 @@ async def auth_callback(provider: str, request: Request, db: Session = Depends(g
     return RedirectResponse(url="/", status_code=303)
 
 
-@app.get("/change-password", response_class=HTMLResponse)
+@app.get("/change-password", response_class=HTMLResponse, tags=[PageType.INFO])
 async def change_password_page(
     request: Request,
     accept_language: str = Header(None),
@@ -466,7 +471,7 @@ async def change_password_page(
     return templates.TemplateResponse(request, "change_password.html", {"t": t, "user": user})
 
 
-@app.post("/change-password")
+@app.post("/change-password", tags=[PageType.INFO])
 async def change_password(
     request: Request,
     new_password: str = Form(...),
@@ -490,7 +495,7 @@ async def change_password(
 
 # --- 8. ADMIN & USER MANAGEMENT ---
 
-@app.get("/admin/users", response_class=HTMLResponse)
+@app.get("/admin/users", response_class=HTMLResponse, tags=[PageType.MAINTENANCE])
 async def list_users(
     request: Request,
     accept_language: str = Header(None),
@@ -503,7 +508,7 @@ async def list_users(
     return templates.TemplateResponse(request, "admin_users.html", {"t": t, "users": users, "user": user})
 
 
-@app.post("/admin/users/force-password-change/{user_id}")
+@app.post("/admin/users/force-password-change/{user_id}", tags=[PageType.MAINTENANCE])
 async def admin_force_password_change(
     user_id: int,
     user: User = Depends(login_required),
@@ -519,7 +524,7 @@ async def admin_force_password_change(
     return RedirectResponse(url="/admin/users", status_code=303)
 
 
-@app.post("/admin/users/update/{user_id}")
+@app.post("/admin/users/update/{user_id}", tags=[PageType.MAINTENANCE])
 async def update_user(
     user_id: int,
     email: str = Form(...),
@@ -542,12 +547,12 @@ async def update_user(
     return RedirectResponse(url="/admin/users", status_code=303)
 
 
-@app.get("/admin/role")
+@app.get("/admin/role", tags=[PageType.MAINTENANCE])
 async def redirect_to_roles():
     return RedirectResponse(url="/admin/roles", status_code=303)
 
 
-@app.get("/admin/roles", response_class=HTMLResponse)
+@app.get("/admin/roles", response_class=HTMLResponse, tags=[PageType.MAINTENANCE])
 async def list_roles(
     request: Request,
     accept_language: str = Header(None),
@@ -564,7 +569,7 @@ async def list_roles(
         "all_users": all_users
     })
 
-@app.post("/admin/roles/create")
+@app.post("/admin/roles/create", tags=[PageType.MAINTENANCE])
 async def create_role(
     name: str = Form(...),
     description: str = Form(""),
@@ -577,7 +582,7 @@ async def create_role(
     logger.info(f"Role '{name}' created by {user.email}")
     return RedirectResponse(url="/admin/roles", status_code=303)
 
-@app.post("/admin/roles/update/{role_id}")
+@app.post("/admin/roles/update/{role_id}", tags=[PageType.MAINTENANCE])
 async def update_role(
     role_id: int,
     name: str = Form(...),
@@ -600,7 +605,7 @@ async def update_role(
         logger.info(f"Role '{name}' updated by {user.email}")
     return RedirectResponse(url="/admin/roles", status_code=303)
 
-@app.post("/admin/roles/delete/{role_id}")
+@app.post("/admin/roles/delete/{role_id}", tags=[PageType.MAINTENANCE])
 async def delete_role(
     role_id: int,
     user: User = Depends(login_required),
@@ -616,7 +621,7 @@ async def delete_role(
     return RedirectResponse(url="/admin/roles", status_code=303)
 
 
-@app.post("/admin/users/delete/{user_id}")
+@app.post("/admin/users/delete/{user_id}", tags=[PageType.MAINTENANCE])
 async def delete_user(
     user_id: int,
     user: User = Depends(login_required),
@@ -632,6 +637,15 @@ async def delete_user(
         logger.info(f"User {target_user.email} deleted by {user.email}")
     return RedirectResponse(url="/admin/users", status_code=303)
 
+@app.get("/admin/securities", response_class=HTMLResponse, tags=[PageType.MAINTENANCE])
+async def maintenance_securities(request: Request, user: User = Depends(login_required)):
+    t = get_text()
+    return HTMLResponse(content="<h1>Securities Maintenance Coming Soon</h1><a href='/'>Back</a>")
+
+@app.get("/admin/permissions", response_class=HTMLResponse, tags=[PageType.MAINTENANCE])
+async def maintenance_permissions(request: Request, user: User = Depends(login_required)):
+    t = get_text()
+    return HTMLResponse(content="<h1>Permissions Maintenance Coming Soon</h1><a href='/'>Back</a>")
 
 if __name__ == "__main__":
     import uvicorn

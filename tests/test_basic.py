@@ -22,7 +22,8 @@ def test_forgot_password_page(client):
 def test_forgot_password_post(client):
     response = client.post("/forgot-password", data={"email": "test@example.com"})
     assert response.status_code == 200
-    assert "you will receive a reset link shortly" in response.text
+    assert "receive a reset link shortly" in response.text
+    assert "Back to Login" in response.text
 
 def test_login_page(client):
     response = client.get("/login")
