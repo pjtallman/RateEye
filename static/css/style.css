@@ -45,14 +45,13 @@ body {
 
 .dropdown div {
     padding: 10px 15px;
-    border-bottom: 1px solid #eee;
     font-size: 14px;
     color: #333;
     white-space: nowrap;
 }
 
 .dropdown div:hover {
-    background-color: #f1f1f1;
+    background-color: #e9e9e9;
 }
 
 /* Ensure hover state persists when moving to dropdown */

@@ -371,6 +371,12 @@ async def show_log(user: User = Depends(login_required), db: Session = Depends(g
     return "No log file found."
 
 
+@app.get("/about", response_class=HTMLResponse)
+async def about_page(request: Request, accept_language: str = Header(None)):
+    t = get_text(accept_language)
+    return templates.TemplateResponse(request, "about.html", {"t": t})
+
+
 # --- 7. OAUTH2 SETUP ---
 oauth = OAuth()
 oauth.register(
@@ -482,7 +488,7 @@ async def change_password(
     return RedirectResponse(url="/", status_code=303)
 
 
-# --- 8. USER MANAGEMENT (CRUD) ---
+# --- 8. ADMIN & USER MANAGEMENT ---
 
 @app.get("/admin/users", response_class=HTMLResponse)
 async def list_users(
@@ -521,13 +527,10 @@ async def update_user(
     user: User = Depends(login_required),
     db: Session = Depends(get_db)
 ):
-    # Future: check for admin permissions
     target_user = db.query(User).filter(User.id == user_id).first()
     if target_user:
-        # Check if email is already taken by another user
         existing_user = db.query(User).filter(User.email == email, User.id != user_id).first()
         if existing_user:
-             # In a real app, we might want to return an error message to the UI
              logger.warning(f"Admin {user.email} tried to change user {user_id} email to already taken {email}")
              return RedirectResponse(url="/admin/users", status_code=303)
              
@@ -553,7 +556,6 @@ async def list_roles(
 ):
     t = get_text(accept_language)
     roles = db.query(Role).all()
-    # Also need users to add to roles
     all_users = db.query(User).all()
     return templates.TemplateResponse(request, "admin_roles.html", {
         "t": t, 
@@ -580,7 +582,7 @@ async def update_role(
     role_id: int,
     name: str = Form(...),
     description: str = Form(""),
-    user_ids: Optional[str] = Form(None), # Comma separated list of user IDs
+    user_ids: Optional[str] = Form(None),
     user: User = Depends(login_required),
     db: Session = Depends(get_db)
 ):
@@ -588,19 +590,14 @@ async def update_role(
     if role:
         role.name = name
         role.description = description
-        
-        # Update associated users
         if user_ids is not None:
-            # Clear current users and add new ones
             role.users = []
             if user_ids.strip():
                 id_list = [int(id_str) for id_str in user_ids.split(",") if id_str.strip()]
                 users_to_add = db.query(User).filter(User.id.in_(id_list)).all()
                 role.users.extend(users_to_add)
-        
         db.commit()
         logger.info(f"Role '{name}' updated by {user.email}")
-    
     return RedirectResponse(url="/admin/roles", status_code=303)
 
 @app.post("/admin/roles/delete/{role_id}")
@@ -612,12 +609,10 @@ async def delete_role(
     role = db.query(Role).filter(Role.id == role_id).first()
     if role:
         if role.name in ["Admin", "User"]:
-            # Prevent deleting system roles
              return RedirectResponse(url="/admin/roles", status_code=303)
         db.delete(role)
         db.commit()
         logger.info(f"Role '{role.name}' deleted by {user.email}")
-    
     return RedirectResponse(url="/admin/roles", status_code=303)
 
 
@@ -629,19 +624,15 @@ async def delete_user(
 ):
     if user.id == user_id:
          raise HTTPException(status_code=400, detail="Cannot delete yourself")
-    
     target_user = db.query(User).filter(User.id == user_id).first()
     if target_user:
-        # Explicitly remove user from all roles first (though SQLAlchemy handles this)
         target_user.roles = []
         db.delete(target_user)
         db.commit()
         logger.info(f"User {target_user.email} deleted by {user.email}")
-    
     return RedirectResponse(url="/admin/users", status_code=303)
 
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="0.0.0.0", port=8000)

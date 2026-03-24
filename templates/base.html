@@ -3,22 +3,23 @@
 <head>
     <link rel="stylesheet" href="/static/css/style.css">
     <title>{% block title %}{{ t.title }}{% endblock %}</title>
+    <style>
+        .dropdown div.menu-separator {
+            padding: 0;
+            height: 1px;
+            background-color: #ddd;
+            margin: 5px 0;
+            pointer-events: none; /* Don't highlight on hover */
+        }
+    </style>
 </head>
 <body>
     <div class="menu-bar">
-        <div class="menu-item">{{ t.menu_file }}
+        <div class="menu-item">{{ t.menu_activities or 'Activities' }}
             <div class="dropdown">
-                <div>{{ t.item_add }}</div>
-                <div>{{ t.item_edit_tickers }}</div>
+                <div>{{ t.item_securities or 'Securities' }}</div>
+                <div class="menu-separator"></div>
                 <div onclick="window.location.href='/settings/user'">{{ t.item_user_settings }}</div>
-            </div>
-        </div>
-
-        <div class="menu-item">{{ t.menu_edit }}
-            <div class="dropdown">
-                <div>{{ t.item_cut }}</div>
-                <div>{{ t.item_copy }}</div>
-                <div>{{ t.item_paste }}</div>
             </div>
         </div>
 
@@ -28,19 +29,21 @@
             </div>
         </div>
 
-        <div class="menu-item">Admin
+        <div class="menu-item">{{ t.menu_admin or 'Admin' }}
             <div class="dropdown">
-                <div onclick="window.location.href='/admin/users'">User Maintenance</div>
-                <div onclick="window.location.href='/admin/roles'">Roles Maintenance</div>
+                <div onclick="window.location.href='/admin/roles'">{{ t.item_roles or 'Roles' }}</div>
+                <div onclick="alert('Permissions management coming soon!')">{{ t.item_permissions or 'Permissions' }}</div>
+                <div class="menu-separator"></div>
+                <div onclick="window.location.href='/admin/users'">{{ t.item_users or 'Users' }}</div>
+                <div class="menu-separator"></div>
                 <div onclick="window.location.href='/settings/system'">{{ t.item_system_settings }}</div>
-                <div onclick="alert('Permissions management coming soon!')">Permissions</div>
             </div>
         </div>
 
         <div class="menu-item">{{ t.menu_help }}
             <div class="dropdown">
                 <div onclick="window.open('/show-log', '_blank')">{{ t.item_show_log }}</div>
-                <div>{{ t.item_about }}</div>
+                <div onclick="window.location.href='/about'">{{ t.item_about }}</div>
             </div>
         </div>
 
