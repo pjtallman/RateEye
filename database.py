@@ -63,6 +63,17 @@ def init_db():
     log_lines = db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first()
     if not log_lines:
         db.add(SystemSetting(name="log_lines", value="100"))
+
+    # Sync version from file system
+    if os.path.exists("VERSION"):
+        with open("VERSION", "r") as f:
+            current_version = f.read().strip()
+            if current_version:
+                version_setting = db.query(SystemSetting).filter(SystemSetting.name == "version").first()
+                if not version_setting:
+                    db.add(SystemSetting(name="version", value=current_version))
+                elif version_setting.value != current_version:
+                    version_setting.value = current_version
     
     # 2. Seed default roles
     admin_role = db.query(Role).filter(Role.name == "Admin").first()

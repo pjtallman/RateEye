@@ -377,9 +377,14 @@ async def show_log(user: User = Depends(login_required), db: Session = Depends(g
 
 
 @app.get("/about", response_class=HTMLResponse, tags=[PageType.INFO])
-async def about_page(request: Request, accept_language: str = Header(None)):
+async def about_page(
+    request: Request,
+    accept_language: str = Header(None),
+    db: Session = Depends(get_db)
+):
     t = get_text(accept_language)
-    return templates.TemplateResponse(request, "about.html", {"t": t})
+    version = get_system_setting(db, "version", "Unknown")
+    return templates.TemplateResponse(request, "about.html", {"t": t, "version": version})
 
 
 # --- 7. OAUTH2 SETUP ---
