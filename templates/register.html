@@ -15,7 +15,7 @@
         {% endif %}
 
         <form action="/register" method="post">
-            <label>Username:</label>
+            <label>{{ t.label_username }}</label>
             <input type="text" name="username" required>
             <label>{{ t.label_email }}</label>
             <input type="email" name="email" required>

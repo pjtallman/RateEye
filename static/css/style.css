@@ -157,3 +157,13 @@ body {
     background-color: #ffcc00;
     color: #000;
 }
+
+.user-photo {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #eee;
+    margin-left: 10px;
+    object-fit: cover;
+    border: 1px solid #fff;
+}

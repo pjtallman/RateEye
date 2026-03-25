@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Handle menu navigation
-    const menuItems = document.querySelectorAll('.dropdown div:not(.menu-separator)');
+    const menuItems = document.querySelectorAll('.menu-item[data-href], .dropdown div:not(.menu-separator)');
     
     menuItems.forEach(item => {
         item.addEventListener('click', () => {

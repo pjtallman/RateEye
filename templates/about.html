@@ -1,16 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}About RateEye{% endblock %}
+{% block title %}{{ t.heading_about }}{% endblock %}
 
 {% block content %}
 <div style="text-align: center; margin-top: 50px;">
     <h1>RateEye</h1>
-    <p>Version {{ version }}</p>
+    <p>{{ t.label_version }} {{ version }}</p>
     <div style="margin-top: 50px;">
-        <p>Copyright &copy; Patrick James Tallman</p>
-    </div>
-    <div style="margin-top: 30px;">
-        <a href="/" class="btn">Back</a>
+        <p>{{ t.label_copyright }} &copy; 2026 Patrick James Tallman</p>
     </div>
 </div>
 {% endblock %}

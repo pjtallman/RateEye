@@ -15,11 +15,11 @@
 </head>
 <body>
     <div class="menu-bar">
+        <div class="menu-item" data-href="/">{{ t.item_home or 'Home' }}</div>
+
         <div class="menu-item">{{ t.menu_activities or 'Activities' }}
             <div class="dropdown">
                 <div data-href="/admin/securities">{{ t.item_securities or 'Securities' }}</div>
-                <div class="menu-separator"></div>
-                <div data-href="/settings/user">{{ t.item_user_settings }}</div>
             </div>
         </div>
 
@@ -50,7 +50,20 @@
         <div class="user-info">
             {% if user %}
                 <span>{{ t.msg_logged_in_as }} {{ user.email }}</span>
-                <a href="/logout">{{ t.nav_logout }}</a>
+                <a href="/logout" style="margin-right: 15px;">{{ t.nav_logout }}</a>
+                
+                <div class="menu-item" style="padding: 0;">
+                    {% if user.photo_url %}
+                        <img src="{{ user.photo_url }}" class="user-photo" alt="User Photo">
+                    {% else %}
+                        <div class="user-photo" style="display: flex; align-items: center; justify-content: center; font-size: 10px; color: #666;">
+                            RP
+                        </div>
+                    {% endif %}
+                    <div class="dropdown" style="left: auto; right: 0;">
+                        <div data-href="/settings/user">{{ t.item_user_settings }}</div>
+                    </div>
+                </div>
             {% else %}
                 <a href="/login">{{ t.nav_login }}</a>
                 <a href="/register">{{ t.nav_register }}</a>

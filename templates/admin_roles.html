@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Roles Management{% endblock %}
+{% block title %}{{ t.heading_roles_maintenance }}{% endblock %}
 
 {% block content %}
     <style>
@@ -47,27 +47,27 @@
         .remove-btn { color: #c00; font-weight: bold; border: none; background: none; cursor: pointer; }
     </style>
 
-    <h1>Roles Maintenance</h1>
+    <h1>{{ t.heading_roles_maintenance }}</h1>
 
     <div class="action-bar">
         <div class="left-actions">
-            <button id="btn-new" class="btn-action btn-add">New Role</button>
-            <button id="btn-edit" class="btn-action btn-edit">Edit</button>
-            <button id="btn-delete" class="btn-action btn-delete">Delete</button>
+            <button id="btn-new" class="btn-action btn-add">{{ t.btn_new_role }}</button>
+            <button id="btn-edit" class="btn-action btn-edit">{{ t.btn_edit }}</button>
+            <button id="btn-delete" class="btn-action btn-delete">{{ t.btn_delete }}</button>
         </div>
         <div class="right-actions">
-            <button id="btn-save" class="btn-action btn-save" disabled>Save</button>
-            <button id="btn-cancel" class="btn-action btn-cancel" disabled>Cancel</button>
+            <button id="btn-save" class="btn-action btn-save" disabled>{{ t.btn_save }}</button>
+            <button id="btn-cancel" class="btn-action btn-cancel" disabled>{{ t.btn_cancel }}</button>
         </div>
     </div>
 
-    <div class="section-header">Roles</div>
+    <div class="section-header">{{ t.item_roles }}</div>
     <table id="roles-table">
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Role Name</th>
-                <th>Description</th>
+                <th>{{ t.th_id }}</th>
+                <th>{{ t.th_role_name }}</th>
+                <th>{{ t.th_description }}</th>
             </tr>
         </thead>
         <tbody>
@@ -86,23 +86,23 @@
     </table>
 
     <div id="child-container" class="child-table-container">
-        <div class="section-header">Assigned Users</div>
+        <div class="section-header">{{ t.heading_assigned_users }}</div>
         <div class="child-actions">
             <select id="user-selector" class="edit-input" style="width: 250px;">
-                <option value="">-- Select User to Add --</option>
+                <option value="">{{ t.option_select_user }}</option>
                 {% for u in all_users %}
                 <option value="{{ u.id }}">{{ u.username }} ({{ u.email }})</option>
                 {% endfor %}
             </select>
-            <button id="btn-add-user" class="btn-action btn-add" disabled>Add User</button>
+            <button id="btn-add-user" class="btn-action btn-add" disabled>{{ t.btn_add_user }}</button>
         </div>
         <table id="assigned-users-table">
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Action</th>
+                    <th>{{ t.th_id }}</th>
+                    <th>{{ t.th_username }}</th>
+                    <th>{{ t.th_email }}</th>
+                    <th>{{ t.th_action or 'Action' }}</th>
                 </tr>
             </thead>
             <tbody>

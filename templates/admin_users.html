@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}User Management{% endblock %}
+{% block title %}{{ t.heading_user_maintenance }}{% endblock %}
 
 {% block content %}
     <style>
@@ -25,8 +25,7 @@
         }
 
         .left-actions, .right-actions {
-            display: flex;
-            gap: 10px;
+            display: flex; gap: 10px;
         }
 
         .btn-action {
@@ -54,29 +53,29 @@
         }
     </style>
 
-    <h1>User Maintenance</h1>
+    <h1>{{ t.heading_user_maintenance }}</h1>
 
-    <p>Current User: <strong>{{ user.username or user.email }}</strong></p>
+    <p>{{ t.label_current_user }}: <strong>{{ user.username or user.email }}</strong></p>
 
     <div class="action-bar">
         <div class="left-actions">
-            <button id="btn-edit" class="btn-action btn-edit">Edit</button>
-            <button id="btn-delete" class="btn-action btn-delete">Delete</button>
+            <button id="btn-edit" class="btn-action btn-edit">{{ t.btn_edit }}</button>
+            <button id="btn-delete" class="btn-action btn-delete">{{ t.btn_delete }}</button>
         </div>
         <div class="right-actions">
-            <button id="btn-save" class="btn-action btn-save" disabled>Save</button>
-            <button id="btn-cancel" class="btn-action btn-cancel" disabled>Cancel</button>
+            <button id="btn-save" class="btn-action btn-save" disabled>{{ t.btn_save }}</button>
+            <button id="btn-cancel" class="btn-action btn-cancel" disabled>{{ t.btn_cancel }}</button>
         </div>
     </div>
 
     <table id="user-table">
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Username</th>
-                <th>Email</th>
-                <th>Provider</th>
-                <th>Force Password Change</th>
+                <th>{{ t.th_id }}</th>
+                <th>{{ t.th_username }}</th>
+                <th>{{ t.th_email }}</th>
+                <th>{{ t.th_provider }}</th>
+                <th>{{ t.th_force_pw_change }}</th>
             </tr>
         </thead>
         <tbody>
@@ -86,7 +85,9 @@
                 <td>{{ u.username or u.email.split('@')[0] }}</td>
                 <td class="col-email" data-original="{{ u.email }}">{{ u.email }}</td>
                 <td>{{ u.provider }}</td>
-                <td class="col-force-pw" data-original="{{ 'true' if u.force_password_change else 'false' }}">{{ "Yes" if u.force_password_change else "No" }}</td>
+                <td class="col-force-pw" data-original="{{ 'true' if u.force_password_change else 'false' }}">
+                    {{ t.msg_yes if u.force_password_change else t.msg_no }}
+                </td>
             </tr>
             {% endfor %}
         </tbody>

@@ -16,7 +16,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "a-very-secret-key-for-development")
 if IS_TESTING:
     SECRET_KEY = "a-very-secret-key-for-development"
 
-from fastapi import FastAPI, Request, Form, Header, Depends, HTTPException, status
+from fastapi import FastAPI, Request, Form, Header, Depends, HTTPException, status, File, UploadFile
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -106,8 +106,9 @@ def login_required(user: Optional[User] = Depends(get_current_user)):
         )
     # Ensure user is authorized
     if not user.is_authorized:
+        t = get_text(request.headers.get("accept-language"))
         logger.warning(f"User {user.email} is not authorized.")
-        raise HTTPException(status_code=403, detail="User not authorized")
+        raise HTTPException(status_code=403, detail=t.get("err_user_not_authorized"))
     return user
 
 
@@ -179,13 +180,13 @@ async def register_user(
     if db.query(User).filter(User.username == username).first():
         t = get_text(accept_language)
         return templates.TemplateResponse(
-            request, "register.html", {"t": t, "error": "Username already taken"}
+            request, "register.html", {"t": t, "error": t.get("err_username_taken")}
         )
     # Check if email exists
     if db.query(User).filter(User.email == email).first():
         t = get_text(accept_language)
         return templates.TemplateResponse(
-            request, "register.html", {"t": t, "error": "Email already registered"}
+            request, "register.html", {"t": t, "error": t.get("err_email_registered")}
         )
     hashed_password = get_password_hash(password)
     new_user = User(username=username, email=email, hashed_password=hashed_password, is_authorized=True)
@@ -202,9 +203,10 @@ async def forgot_password_page(request: Request, accept_language: str = Header(N
 
 
 @app.post("/forgot-password", tags=[PageType.INFO])
-async def forgot_password(email: str = Form(...)):
+async def forgot_password(request: Request, email: str = Form(...), accept_language: str = Header(None)):
+    t = get_text(accept_language)
     logger.info(f"Password reset requested for: {email}")
-    return HTMLResponse(content="<p>If an account exists with this email, you will receive a reset link shortly.</p><a href='/login'>Back to Login</a>")
+    return HTMLResponse(content=f"<p>{t.get('msg_forgot_pw_sent')}</p><a href='/login'>{t.get('btn_back')}</a>")
 
 
 @app.get("/login", response_class=HTMLResponse, tags=[PageType.INFO])
@@ -227,7 +229,7 @@ async def login(
     if not user or not verify_password(password, user.hashed_password):
         t = get_text(accept_language)
         return templates.TemplateResponse(
-            request, "login.html", {"t": t, "error": "Invalid email/username or password"}
+            request, "login.html", {"t": t, "error": t.get("err_invalid_login")}
         )
     request.session["user_id"] = user.id
     logger.info("Login successful. Setting session.")
@@ -284,7 +286,7 @@ async def user_change_username(
     if db.query(User).filter(User.username == new_username).first():
         t = get_text(accept_language)
         return templates.TemplateResponse(
-            request, "user_change_username.html", {"t": t, "user": user, "error": "Username already taken"}
+            request, "user_change_username.html", {"t": t, "user": user, "error": t.get("err_username_taken")}
         )
 
     old_username = user.username
@@ -317,18 +319,46 @@ async def user_change_password(
     if not verify_password(current_password, user.hashed_password):
         t = get_text(accept_language)
         return templates.TemplateResponse(
-            request, "user_change_password.html", {"t": t, "user": user, "error": "Current password is incorrect"}
+            request, "user_change_password.html", {"t": t, "user": user, "error": t.get("err_current_password_incorrect")}
         )
     
     if new_password != confirm_password:
         t = get_text(accept_language)
         return templates.TemplateResponse(
-            request, "user_change_password.html", {"t": t, "user": user, "error": "New passwords do not match"}
+            request, "user_change_password.html", {"t": t, "user": user, "error": t.get("err_passwords_mismatch")}
         )
     
     user.hashed_password = get_password_hash(new_password)
     db.commit()
     logger.info(f"User {user.email} changed their password voluntarily.")
+    return RedirectResponse(url="/settings/user", status_code=303)
+
+
+@app.post("/settings/user/upload-photo", tags=[PageType.SETTINGS])
+async def upload_photo(
+    request: Request,
+    file: UploadFile = File(...),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db),
+):
+    # Ensure it is an image
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    # Create safe filename
+    ext = os.path.splitext(file.filename)[1]
+    filename = f"user_{user.id}{ext}"
+    filepath = os.path.join("static", "uploads", "profile_photos", filename)
+
+    # Save file
+    with open(filepath, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # Update DB
+    user.photo_url = f"/static/uploads/profile_photos/{filename}"
+    db.commit()
+
+    logger.info(f"User {user.email} uploaded a new profile photo: {user.photo_url}")
     return RedirectResponse(url="/settings/user", status_code=303)
 
 
@@ -366,14 +396,15 @@ async def save_system_settings(
 
 
 @app.get("/show-log", response_class=PlainTextResponse, tags=[PageType.INFO])
-async def show_log(user: User = Depends(login_required), db: Session = Depends(get_db)):
+async def show_log(request: Request, accept_language: str = Header(None), user: User = Depends(login_required), db: Session = Depends(get_db)):
     line_limit = int(get_system_setting(db, "log_lines", "100"))
     if os.path.exists(ACTIVE_LOG):
         with open(ACTIVE_LOG, "r") as f:
             lines = f.readlines()
             content = "".join(lines[-line_limit:])
         return content
-    return "No log file found."
+    t = get_text(accept_language)
+    return t.get("err_no_log_found")
 
 
 @app.get("/about", response_class=HTMLResponse, tags=[PageType.INFO])
@@ -488,7 +519,7 @@ async def change_password(
     if new_password != confirm_password:
         t = get_text(accept_language)
         return templates.TemplateResponse(
-            request, "change_password.html", {"t": t, "user": user, "error": "Passwords do not match"}
+            request, "change_password.html", {"t": t, "user": user, "error": t.get("err_passwords_mismatch")}
         )
     
     user.hashed_password = get_password_hash(new_password)
@@ -629,11 +660,14 @@ async def delete_role(
 @app.post("/admin/users/delete/{user_id}", tags=[PageType.MAINTENANCE])
 async def delete_user(
     user_id: int,
+    request: Request,
+    accept_language: str = Header(None),
     user: User = Depends(login_required),
     db: Session = Depends(get_db)
 ):
     if user.id == user_id:
-         raise HTTPException(status_code=400, detail="Cannot delete yourself")
+        t = get_text(accept_language)
+        raise HTTPException(status_code=400, detail=t.get("err_cannot_delete_self"))
     target_user = db.query(User).filter(User.id == user_id).first()
     if target_user:
         target_user.roles = []
@@ -643,14 +677,14 @@ async def delete_user(
     return RedirectResponse(url="/admin/users", status_code=303)
 
 @app.get("/admin/securities", response_class=HTMLResponse, tags=[PageType.MAINTENANCE])
-async def maintenance_securities(request: Request, user: User = Depends(login_required)):
-    t = get_text()
-    return HTMLResponse(content="<h1>Securities Maintenance Coming Soon</h1><a href='/'>Back</a>")
+async def maintenance_securities(request: Request, accept_language: str = Header(None), user: User = Depends(login_required)):
+    t = get_text(accept_language)
+    return templates.TemplateResponse(request, "admin_securities.html", {"t": t, "user": user})
 
 @app.get("/admin/permissions", response_class=HTMLResponse, tags=[PageType.MAINTENANCE])
-async def maintenance_permissions(request: Request, user: User = Depends(login_required)):
-    t = get_text()
-    return HTMLResponse(content="<h1>Permissions Maintenance Coming Soon</h1><a href='/'>Back</a>")
+async def maintenance_permissions(request: Request, accept_language: str = Header(None), user: User = Depends(login_required)):
+    t = get_text(accept_language)
+    return templates.TemplateResponse(request, "admin_permissions.html", {"t": t, "user": user})
 
 if __name__ == "__main__":
     import uvicorn

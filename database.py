@@ -51,6 +51,7 @@ class User(Base):
     force_password_change = Column(Boolean, default=False)
     provider = Column(String, default="local")
     profile_json = Column(Text, nullable=True)
+    photo_url = Column(String, nullable=True)
     
     settings = relationship("UserSetting", back_populates="user", cascade="all, delete-orphan")
     roles = relationship("Role", secondary=user_roles, back_populates="users")
