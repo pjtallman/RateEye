@@ -27,16 +27,11 @@ from authlib.integrations.starlette_client import OAuth
 
 # Local Imports
 from i18n import get_text
-from database import User, UserSetting, SystemSetting, Role, user_roles, engine, SessionLocal, get_db, init_db, get_system_setting
+from database import User, UserSetting, SystemSetting, Role, user_roles, engine, SessionLocal, get_db, init_db, get_system_setting, PageType, Permission, PermissionLevel, get_pages
 
 # --- 1. LOGGING & ENVIRONMENT SETUP ---
 LOG_DIR = "logs"
 ACTIVE_LOG = os.path.join(LOG_DIR, "RateEye.log")
-
-class PageType(str, Enum):
-    MAINTENANCE = "Maintenance"
-    SETTINGS = "Settings"
-    INFO = "Info"
 
 def rotate_logs():
     """Rotates the production log file daily. Skipped during unit tests."""
@@ -67,7 +62,8 @@ else:
 logger = logging.getLogger(__name__)
 
 # Initialize database
-init_db()
+if not IS_TESTING:
+    init_db()
 
 # --- 3. AUTH & SECURITY SETUP ---
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -682,9 +678,165 @@ async def maintenance_securities(request: Request, accept_language: str = Header
     return templates.TemplateResponse(request, "admin_securities.html", {"t": t, "user": user})
 
 @app.get("/admin/permissions", response_class=HTMLResponse, tags=[PageType.MAINTENANCE])
-async def maintenance_permissions(request: Request, accept_language: str = Header(None), user: User = Depends(login_required)):
+async def list_permissions(
+    request: Request,
+    accept_language: str = Header(None),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
     t = get_text(accept_language)
-    return templates.TemplateResponse(request, "admin_permissions.html", {"t": t, "user": user})
+    permissions = db.query(Permission).all()
+    roles = db.query(Role).all()
+    users = db.query(User).all()
+    pages = get_pages()
+    
+    # Grouping structure: { PageType: { page_path: { subject_key: [levels] } } }
+    grouped = {}
+    for pt in PageType:
+        grouped[pt] = {}
+        # Pre-populate pages for this type
+        for path, p_type in pages:
+            if p_type == pt:
+                grouped[pt][path] = {}
+
+    for p in permissions:
+        pt = p.page_type
+        path = p.page_path
+        if pt not in grouped: grouped[pt] = {}
+        if path not in grouped[pt]: grouped[pt][path] = {}
+        
+        subject_key = f"role:{p.role_id}" if p.role_id else f"user:{p.user_id}"
+        if subject_key not in grouped[pt][path]:
+            grouped[pt][path][subject_key] = {
+                "role": p.role,
+                "user": p.user,
+                "permissions": []
+            }
+        grouped[pt][path][subject_key]["permissions"].append(p)
+        
+    return templates.TemplateResponse(
+        request, 
+        "admin_permissions.html", 
+        {
+            "t": t, 
+            "user": user, 
+            "grouped": grouped,
+            "roles": roles,
+            "users": users,
+            "page_types": list(PageType),
+            "permission_levels": list(PermissionLevel)
+        }
+    )
+
+@app.post("/admin/permissions/create", tags=[PageType.MAINTENANCE])
+async def create_permission(
+    page_path: str = Form(...),
+    subject: str = Form(...), # Format: "role:ID" or "user:ID"
+    level: PermissionLevel = Form(...),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    subject_type, subject_id = subject.split(":")
+    role_id = int(subject_id) if subject_type == "role" else None
+    user_id = int(subject_id) if subject_type == "user" else None
+    
+    # Find page type for this path
+    page_type = next((pt for path, pt in get_pages() if path == page_path), PageType.INFO)
+
+    # Exclusivity Logic
+    if level in [PermissionLevel.FULL, PermissionLevel.NONE]:
+        # Delete ALL existing permissions for this (subject, page)
+        db.query(Permission).filter(
+            Permission.page_path == page_path,
+            Permission.role_id == role_id,
+            Permission.user_id == user_id
+        ).delete()
+        # Add the new one
+        new_perm = Permission(page_path=page_path, page_type=page_type, role_id=role_id, user_id=user_id, level=level)
+        db.add(new_perm)
+    else:
+        # CRUD levels
+        # 1. Delete FULL or NONE if they exist
+        db.query(Permission).filter(
+            Permission.page_path == page_path,
+            Permission.role_id == role_id,
+            Permission.user_id == user_id,
+            Permission.level.in_([PermissionLevel.FULL, PermissionLevel.NONE])
+        ).delete()
+        
+        # 2. Add this level if not already present
+        existing = db.query(Permission).filter(
+            Permission.page_path == page_path,
+            Permission.role_id == role_id,
+            Permission.user_id == user_id,
+            Permission.level == level
+        ).first()
+        if not existing:
+            new_perm = Permission(page_path=page_path, page_type=page_type, role_id=role_id, user_id=user_id, level=level)
+            db.add(new_perm)
+    
+    db.commit()
+    logger.info(f"Permission updated for {subject} on {page_path} to include {level} by {user.email}")
+    return RedirectResponse(url="/admin/permissions", status_code=303)
+
+@app.post("/admin/permissions/delete-subject", tags=[PageType.MAINTENANCE])
+async def delete_subject_permissions(
+    page_path: str = Form(...),
+    subject: str = Form(...), # Format: "role:ID" or "user:ID"
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    subject_type, subject_id = subject.split(":")
+    role_id = int(subject_id) if subject_type == "role" else None
+    user_id = int(subject_id) if subject_type == "user" else None
+
+    # Delete all
+    db.query(Permission).filter(
+        Permission.page_path == page_path,
+        Permission.role_id == role_id,
+        Permission.user_id == user_id
+    ).delete()
+    
+    # User requirement: MUST have at least one permission.
+    # If we deleted all, reset to NONE.
+    page_type = next((pt for path, pt in get_pages() if path == page_path), PageType.INFO)
+    new_perm = Permission(page_path=page_path, page_type=page_type, role_id=role_id, user_id=user_id, level=PermissionLevel.NONE)
+    db.add(new_perm)
+    
+    db.commit()
+    logger.info(f"Permissions cleared (reset to NONE) for {subject} on {page_path} by {user.email}")
+    return RedirectResponse(url="/admin/permissions", status_code=303)
+
+@app.post("/admin/permissions/delete/{perm_id}", tags=[PageType.MAINTENANCE])
+async def delete_permission(
+    perm_id: int,
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    perm = db.query(Permission).filter(Permission.id == perm_id).first()
+    if perm:
+        path = perm.page_path
+        role_id = perm.role_id
+        user_id = perm.user_id
+        
+        db.delete(perm)
+        db.commit()
+        
+        # Check if any left for this (subject, page)
+        count = db.query(Permission).filter(
+            Permission.page_path == path,
+            Permission.role_id == role_id,
+            Permission.user_id == user_id
+        ).count()
+        
+        if count == 0:
+            # Add NONE
+            page_type = next((pt for p_path, pt in get_pages() if p_path == path), PageType.INFO)
+            db.add(Permission(page_path=path, page_type=page_type, role_id=role_id, user_id=user_id, level=PermissionLevel.NONE))
+            db.commit()
+
+        logger.info(f"Permission {perm_id} deleted by {user.email}")
+    return RedirectResponse(url="/admin/permissions", status_code=303)
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,5 +1,6 @@
 import pytest
-from main import app, PageType
+from database import PageType
+from main import app
 from fastapi.routing import APIRoute
 
 def test_all_routes_have_page_type():

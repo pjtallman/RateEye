@@ -1,5 +1,6 @@
 import os
-from sqlalchemy import create_engine, Column, String, Integer, Boolean, Text, ForeignKey, Table
+from enum import Enum
+from sqlalchemy import create_engine, Column, String, Integer, Boolean, Text, ForeignKey, Table, Enum as SQLEnum
 from sqlalchemy.orm import sessionmaker, declarative_base, Session, relationship
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./rateeye.db")
@@ -7,6 +8,19 @@ engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
+
+class PageType(str, Enum):
+    MAINTENANCE = "Maintenance"
+    SETTINGS = "Settings"
+    INFO = "Info"
+
+class PermissionLevel(str, Enum):
+    CREATE = "Create"
+    UPDATE = "Update"
+    DELETE = "Delete"
+    READ = "Read"
+    FULL = "Full"
+    NONE = "None"
 
 # Many-to-Many Association Table
 user_roles = Table(
@@ -30,6 +44,18 @@ class UserSetting(Base):
     
     user = relationship("User", back_populates="settings")
 
+class Permission(Base):
+    __tablename__ = "permissions"
+    id = Column(Integer, primary_key=True, index=True)
+    page_path = Column(String, nullable=False) # e.g. "/admin/users"
+    page_type = Column(SQLEnum(PageType), nullable=False)
+    role_id = Column(Integer, ForeignKey("roles.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    level = Column(SQLEnum(PermissionLevel), nullable=False, default=PermissionLevel.NONE)
+
+    role = relationship("Role", back_populates="permissions")
+    user = relationship("User", back_populates="permissions")
+
 class Role(Base):
     __tablename__ = "roles"
     id = Column(Integer, primary_key=True, index=True)
@@ -37,6 +63,7 @@ class Role(Base):
     description = Column(String)
     
     users = relationship("User", secondary=user_roles, back_populates="roles")
+    permissions = relationship("Permission", back_populates="role", cascade="all, delete-orphan")
 
 from passlib.context import CryptContext
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -55,10 +82,14 @@ class User(Base):
     
     settings = relationship("UserSetting", back_populates="user", cascade="all, delete-orphan")
     roles = relationship("Role", secondary=user_roles, back_populates="users")
+    permissions = relationship("Permission", back_populates="user", cascade="all, delete-orphan")
 
-def init_db():
+def init_db(db: Session = None):
     Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
+    standalone = False
+    if db is None:
+        db = SessionLocal()
+        standalone = True
     
     # 1. Seed initial system settings
     log_lines = db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first()
@@ -88,8 +119,58 @@ def init_db():
         db.add(user_role)
     
     db.commit() # Commit roles so they have IDs
+
+    # 3. Seed default permissions for roles
+    # Identify unique pages from main.py routes logic
+    # In a real app, you might want to discover these from the FastAPI app object,
+    # but for init_db (which runs before app start), we list them here.
+    pages = [
+        ("/", PageType.INFO),
+        ("/register", PageType.INFO),
+        ("/forgot-password", PageType.INFO),
+        ("/login", PageType.INFO),
+        ("/logout", PageType.INFO),
+        ("/show-log", PageType.INFO),
+        ("/about", PageType.INFO),
+        ("/change-password", PageType.INFO),
+        ("/settings/user", PageType.SETTINGS),
+        ("/settings/user/change-username", PageType.SETTINGS),
+        ("/settings/user/change-password", PageType.SETTINGS),
+        ("/settings/user/upload-photo", PageType.SETTINGS),
+        ("/settings/system", PageType.SETTINGS),
+        ("/admin/users", PageType.MAINTENANCE),
+        ("/admin/roles", PageType.MAINTENANCE),
+        ("/admin/securities", PageType.MAINTENANCE),
+        ("/admin/permissions", PageType.MAINTENANCE),
+    ]
+
+    admin_menu_pages = ["/admin/roles", "/admin/permissions", "/admin/users", "/settings/system"]
+
+    # Clear old type-based permissions to avoid confusion during this migration
+    db.query(Permission).filter(Permission.page_path == None).delete()
+
+    for path, pt in pages:
+        # Admin Role: Gets FULL for all pages
+        existing_admin = db.query(Permission).filter(
+            Permission.role_id == admin_role.id,
+            Permission.page_path == path
+        ).first()
+        if not existing_admin:
+            db.add(Permission(role_id=admin_role.id, page_path=path, page_type=pt, level=PermissionLevel.FULL))
+
+        # User Role: 
+        # NONE for Admin menu pages, FULL for others
+        existing_user = db.query(Permission).filter(
+            Permission.role_id == user_role.id,
+            Permission.page_path == path
+        ).first()
+        if not existing_user:
+            level = PermissionLevel.NONE if path in admin_menu_pages else PermissionLevel.FULL
+            db.add(Permission(role_id=user_role.id, page_path=path, page_type=pt, level=level))
     
-    # 3. Seed default admin user
+    db.commit()
+    
+    # 4. Seed default admin user
     admin_user = db.query(User).filter(User.username == "admin").first()
     if not admin_user:
         hashed_pwd = pwd_context.hash("adminpassword")
@@ -105,14 +186,15 @@ def init_db():
         db.refresh(admin_user)
         print("Default admin user created: admin / adminpassword")
 
-    # Ensure admin has both roles
+    # Ensure admin user has Admin role
     if admin_role not in admin_user.roles:
         admin_user.roles.append(admin_role)
     if user_role not in admin_user.roles:
         admin_user.roles.append(user_role)
     
     db.commit()
-    db.close()
+    if standalone:
+        db.close()
 
 def get_db():
     db = SessionLocal()
@@ -124,3 +206,25 @@ def get_db():
 def get_system_setting(db: Session, name: str, default: str):
     res = db.query(SystemSetting).filter(SystemSetting.name == name).first()
     return res.value if res else default
+
+def get_pages():
+    """Returns the master list of pages and their types."""
+    return [
+        ("/", PageType.INFO),
+        ("/register", PageType.INFO),
+        ("/forgot-password", PageType.INFO),
+        ("/login", PageType.INFO),
+        ("/logout", PageType.INFO),
+        ("/show-log", PageType.INFO),
+        ("/about", PageType.INFO),
+        ("/change-password", PageType.INFO),
+        ("/settings/user", PageType.SETTINGS),
+        ("/settings/user/change-username", PageType.SETTINGS),
+        ("/settings/user/change-password", PageType.SETTINGS),
+        ("/settings/user/upload-photo", PageType.SETTINGS),
+        ("/settings/system", PageType.SETTINGS),
+        ("/admin/users", PageType.MAINTENANCE),
+        ("/admin/roles", PageType.MAINTENANCE),
+        ("/admin/securities", PageType.MAINTENANCE),
+        ("/admin/permissions", PageType.MAINTENANCE),
+    ]
