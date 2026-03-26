@@ -7,7 +7,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const formPagePath = document.getElementById('form-page-path') as HTMLInputElement;
     const subjectSelect = document.querySelector('select[name="subject"]') as HTMLSelectElement;
 
-    function selectPage(row: HTMLElement, path: string) {
+    function updateEditor(path: string, label: string) {
+        permissionEditor.style.display = 'block';
+        selectedPageDisplay.textContent = `${label} (${path})`;
+        formPagePath.value = path;
+    }
+
+    function selectPage(row: HTMLElement, path: string, label: string) {
         if (selectedPageRow === row && !selectedSubjectRow) {
             // Deselect
             row.classList.remove('selected');
@@ -23,17 +29,14 @@ document.addEventListener('DOMContentLoaded', () => {
             row.classList.add('selected');
             selectedPageRow = row;
             
-            // Update form
-            permissionEditor.style.display = 'block';
-            selectedPageDisplay.textContent = path;
-            formPagePath.value = path;
+            updateEditor(path, label);
             
             // Scroll into view if needed
             permissionEditor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     }
 
-    function selectSubject(row: HTMLElement, subjectKey: string, pagePath: string) {
+    function selectSubject(row: HTMLElement, subjectKey: string, pagePath: string, pageLabel: string) {
         // Find the page row
         const pageRow = row.closest('.page-row') as HTMLElement;
         if (!pageRow) return;
@@ -49,9 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedPageRow = pageRow;
 
         // Update form
-        permissionEditor.style.display = 'block';
-        selectedPageDisplay.textContent = pagePath;
-        formPagePath.value = pagePath;
+        updateEditor(pagePath, pageLabel);
         subjectSelect.value = subjectKey;
 
         permissionEditor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -62,7 +63,8 @@ document.addEventListener('DOMContentLoaded', () => {
         header.addEventListener('click', (e) => {
             const row = header.closest('.page-row') as HTMLElement;
             const path = row.getAttribute('data-page-path') || '';
-            selectPage(row, path);
+            const label = row.getAttribute('data-page-label') || path;
+            selectPage(row, path, label);
         });
     });
 
@@ -72,9 +74,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const target = e.target as HTMLElement;
             if (target.closest('button') || target.closest('form')) return; // Ignore clicks on buttons/forms
 
+            const pageRow = (row as HTMLElement).closest('.page-row') as HTMLElement;
             const subjectKey = (row as HTMLElement).getAttribute('data-subject-key') || '';
             const pagePath = (row as HTMLElement).getAttribute('data-page-path') || '';
-            selectSubject(row as HTMLElement, subjectKey, pagePath);
+            const pageLabel = pageRow ? (pageRow.getAttribute('data-page-label') || pagePath) : pagePath;
+            
+            selectSubject(row as HTMLElement, subjectKey, pagePath, pageLabel);
         });
     });
 });

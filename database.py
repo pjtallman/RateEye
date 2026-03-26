@@ -121,35 +121,15 @@ def init_db(db: Session = None):
     db.commit() # Commit roles so they have IDs
 
     # 3. Seed default permissions for roles
-    # Identify unique pages from main.py routes logic
-    # In a real app, you might want to discover these from the FastAPI app object,
-    # but for init_db (which runs before app start), we list them here.
-    pages = [
-        ("/", PageType.INFO),
-        ("/register", PageType.INFO),
-        ("/forgot-password", PageType.INFO),
-        ("/login", PageType.INFO),
-        ("/logout", PageType.INFO),
-        ("/show-log", PageType.INFO),
-        ("/about", PageType.INFO),
-        ("/change-password", PageType.INFO),
-        ("/settings/user", PageType.SETTINGS),
-        ("/settings/user/change-username", PageType.SETTINGS),
-        ("/settings/user/change-password", PageType.SETTINGS),
-        ("/settings/user/upload-photo", PageType.SETTINGS),
-        ("/settings/system", PageType.SETTINGS),
-        ("/admin/users", PageType.MAINTENANCE),
-        ("/admin/roles", PageType.MAINTENANCE),
-        ("/admin/securities", PageType.MAINTENANCE),
-        ("/admin/permissions", PageType.MAINTENANCE),
-    ]
+    # Identify unique pages from database.py get_pages()
+    pages_list = get_pages()
 
     admin_menu_pages = ["/admin/roles", "/admin/permissions", "/admin/users", "/settings/system"]
 
     # Clear old type-based permissions to avoid confusion during this migration
     db.query(Permission).filter(Permission.page_path == None).delete()
 
-    for path, pt in pages:
+    for path, pt, label_key in pages_list:
         # Admin Role: Gets FULL for all pages
         existing_admin = db.query(Permission).filter(
             Permission.role_id == admin_role.id,
@@ -208,23 +188,23 @@ def get_system_setting(db: Session, name: str, default: str):
     return res.value if res else default
 
 def get_pages():
-    """Returns the master list of pages and their types."""
+    """Returns the master list of pages, their types, and their translation keys."""
     return [
-        ("/", PageType.INFO),
-        ("/register", PageType.INFO),
-        ("/forgot-password", PageType.INFO),
-        ("/login", PageType.INFO),
-        ("/logout", PageType.INFO),
-        ("/show-log", PageType.INFO),
-        ("/about", PageType.INFO),
-        ("/change-password", PageType.INFO),
-        ("/settings/user", PageType.SETTINGS),
-        ("/settings/user/change-username", PageType.SETTINGS),
-        ("/settings/user/change-password", PageType.SETTINGS),
-        ("/settings/user/upload-photo", PageType.SETTINGS),
-        ("/settings/system", PageType.SETTINGS),
-        ("/admin/users", PageType.MAINTENANCE),
-        ("/admin/roles", PageType.MAINTENANCE),
-        ("/admin/securities", PageType.MAINTENANCE),
-        ("/admin/permissions", PageType.MAINTENANCE),
+        ("/", PageType.INFO, "item_home"),
+        ("/register", PageType.INFO, "nav_register"),
+        ("/forgot-password", PageType.INFO, "link_forgot_password"),
+        ("/login", PageType.INFO, "nav_login"),
+        ("/logout", PageType.INFO, "nav_logout"),
+        ("/show-log", PageType.INFO, "item_show_log"),
+        ("/about", PageType.INFO, "item_about"),
+        ("/change-password", PageType.INFO, "heading_change_password"),
+        ("/settings/user", PageType.SETTINGS, "item_user_settings"),
+        ("/settings/user/change-username", PageType.SETTINGS, "link_change_username"),
+        ("/settings/user/change-password", PageType.SETTINGS, "link_change_password"),
+        ("/settings/user/upload-photo", PageType.SETTINGS, "label_profile_photo"),
+        ("/settings/system", PageType.SETTINGS, "item_system_settings"),
+        ("/admin/users", PageType.MAINTENANCE, "item_users"),
+        ("/admin/roles", PageType.MAINTENANCE, "item_roles"),
+        ("/admin/securities", PageType.MAINTENANCE, "item_securities"),
+        ("/admin/permissions", PageType.MAINTENANCE, "item_permissions"),
     ]

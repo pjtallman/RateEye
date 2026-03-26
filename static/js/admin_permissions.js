@@ -6,7 +6,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectedPageDisplay = document.getElementById('selected-page-display');
     const formPagePath = document.getElementById('form-page-path');
     const subjectSelect = document.querySelector('select[name="subject"]');
-    function selectPage(row, path) {
+    function updateEditor(path, label) {
+        permissionEditor.style.display = 'block';
+        selectedPageDisplay.textContent = `${label} (${path})`;
+        formPagePath.value = path;
+    }
+    function selectPage(row, path, label) {
         if (selectedPageRow === row && !selectedSubjectRow) {
             // Deselect
             row.classList.remove('selected');
@@ -23,15 +28,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             row.classList.add('selected');
             selectedPageRow = row;
-            // Update form
-            permissionEditor.style.display = 'block';
-            selectedPageDisplay.textContent = path;
-            formPagePath.value = path;
+            updateEditor(path, label);
             // Scroll into view if needed
             permissionEditor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     }
-    function selectSubject(row, subjectKey, pagePath) {
+    function selectSubject(row, subjectKey, pagePath, pageLabel) {
         // Find the page row
         const pageRow = row.closest('.page-row');
         if (!pageRow)
@@ -46,9 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedSubjectRow = row;
         selectedPageRow = pageRow;
         // Update form
-        permissionEditor.style.display = 'block';
-        selectedPageDisplay.textContent = pagePath;
-        formPagePath.value = pagePath;
+        updateEditor(pagePath, pageLabel);
         subjectSelect.value = subjectKey;
         permissionEditor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
@@ -57,7 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
         header.addEventListener('click', (e) => {
             const row = header.closest('.page-row');
             const path = row.getAttribute('data-page-path') || '';
-            selectPage(row, path);
+            const label = row.getAttribute('data-page-label') || path;
+            selectPage(row, path, label);
         });
     });
     // Subject row selection
@@ -66,9 +67,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const target = e.target;
             if (target.closest('button') || target.closest('form'))
                 return; // Ignore clicks on buttons/forms
+            const pageRow = row.closest('.page-row');
             const subjectKey = row.getAttribute('data-subject-key') || '';
             const pagePath = row.getAttribute('data-page-path') || '';
-            selectSubject(row, subjectKey, pagePath);
+            const pageLabel = pageRow ? (pageRow.getAttribute('data-page-label') || pagePath) : pagePath;
+            selectSubject(row, subjectKey, pagePath, pageLabel);
         });
     });
 });

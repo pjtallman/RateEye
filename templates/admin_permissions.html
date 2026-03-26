@@ -42,14 +42,14 @@
     <div class="page-type-section">
         <div class="page-type-header">{{ pt_key }}</div>
         
-        {% for path, subjects in pages.items() %}
-        <div class="page-row" data-page-path="{{ path }}">
+        {% for path, data in pages.items() %}
+        <div class="page-row" data-page-path="{{ path }}" data-page-label="{{ data.label }}">
             <div class="page-row-header">
-                <span>{{ path }}</span>
-                <span style="font-size: 0.8em; color: #999;">Click to select</span>
+                <span>{{ data.label }} <small style="color: #666; font-weight: normal; margin-left: 10px;">({{ path }})</small></span>
+                <span style="font-size: 0.8em; color: #999;">{{ t.msg_click_to_select or 'Click to select' }}</span>
             </div>
             
-            {% if subjects %}
+            {% if data.subjects %}
             <table>
                 <thead>
                     <tr>
@@ -59,17 +59,17 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for s_key, data in subjects.items() %}
+                    {% for s_key, s_data in data.subjects.items() %}
                     <tr class="subject-row" data-subject-key="{{ s_key }}" data-page-path="{{ path }}">
                         <td>
-                            {% if data.role %}
-                                <strong>{{ data.role.name }}</strong> (Role)
+                            {% if s_data.role %}
+                                <strong>{{ s_data.role.name }}</strong> (Role)
                             {% else %}
-                                {{ data.user.username or data.user.email }} (User)
+                                {{ s_data.user.username or s_data.user.email }} (User)
                             {% endif %}
                         </td>
                         <td>
-                            {% for p in data.permissions %}
+                            {% for p in s_data.permissions %}
                                 <span class="perm-badge perm-{{ p.level.value }}">{{ p.level.value }}</span>
                             {% endfor %}
                         </td>

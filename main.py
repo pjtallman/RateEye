@@ -690,29 +690,39 @@ async def list_permissions(
     users = db.query(User).all()
     pages = get_pages()
     
-    # Grouping structure: { PageType: { page_path: { subject_key: [levels] } } }
+    # Create a map of path -> label
+    page_labels = {path: t.get(label_key, path) for path, pt, label_key in pages}
+
+    # Grouping structure: { PageType: { page_path: { "label": str, "subjects": { subject_key: [levels] } } } }
     grouped = {}
     for pt in PageType:
         grouped[pt] = {}
         # Pre-populate pages for this type
-        for path, p_type in pages:
+        for path, p_type, label_key in pages:
             if p_type == pt:
-                grouped[pt][path] = {}
+                grouped[pt][path] = {
+                    "label": t.get(label_key, path),
+                    "subjects": {}
+                }
 
     for p in permissions:
         pt = p.page_type
         path = p.page_path
         if pt not in grouped: grouped[pt] = {}
-        if path not in grouped[pt]: grouped[pt][path] = {}
+        if path not in grouped[pt]: 
+            grouped[pt][path] = {
+                "label": page_labels.get(path, path),
+                "subjects": {}
+            }
         
         subject_key = f"role:{p.role_id}" if p.role_id else f"user:{p.user_id}"
-        if subject_key not in grouped[pt][path]:
-            grouped[pt][path][subject_key] = {
+        if subject_key not in grouped[pt][path]["subjects"]:
+            grouped[pt][path]["subjects"][subject_key] = {
                 "role": p.role,
                 "user": p.user,
                 "permissions": []
             }
-        grouped[pt][path][subject_key]["permissions"].append(p)
+        grouped[pt][path]["subjects"][subject_key]["permissions"].append(p)
         
     return templates.TemplateResponse(
         request, 
