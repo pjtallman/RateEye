@@ -92,7 +92,10 @@
         "msg_no_permissions": "No permissions defined for this type.",
         "msg_securities_coming_soon": "Securities Maintenance Coming Soon",
         "msg_permissions_coming_soon": "Permissions Maintenance Coming Soon",
-        "err_no_log_found": "No log file found."
+        "err_no_log_found": "No log file found.",
+        "heading_unauthorized": "Access Denied",
+        "msg_unauthorized_body": "You do not have permission to access this page.",
+        "msg_contact_admin": "Please contact a system administrator if you believe this is an error."
     },
     "es": {
         "title": "RateEye - Rastreador de Rendimiento",
@@ -187,6 +190,9 @@
         "msg_no_permissions": "No hay permisos definidos para este tipo.",
         "msg_securities_coming_soon": "Mantenimiento de Valores Próximamente",
         "msg_permissions_coming_soon": "Mantenimiento de Permisos Próximamente",
-        "err_no_log_found": "No se encontró el archivo de registro."
+        "err_no_log_found": "No se encontró el archivo de registro.",
+        "heading_unauthorized": "Acceso Denegado",
+        "msg_unauthorized_body": "No tiene permiso para acceder a esta página.",
+        "msg_contact_admin": "Por favor, póngase en contacto con un administrador del sistema si cree que esto es un error."
     }
 }

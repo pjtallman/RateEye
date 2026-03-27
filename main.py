@@ -115,6 +115,41 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
+@app.exception_handler(403)
+async def unauthorized_exception_handler(request: Request, exc: HTTPException):
+    t = get_text(request.headers.get("accept-language"))
+    return templates.TemplateResponse(
+        request, "unauthorized.html", {"t": t, "user": getattr(request.state, "user", None)}, status_code=403
+    )
+
+
+async def check_page_permission(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(login_required)
+):
+    # Store user in request state for the exception handler
+    request.state.user = user
+    
+    path = request.url.path
+    role_ids = [role.id for role in user.roles]
+    
+    # Query for any permission that grants access
+    # FULL or any CRUD level (READ, CREATE, UPDATE, DELETE)
+    # NONE is excluded by the filter on level
+    permission = db.query(Permission).filter(
+        Permission.page_path == path,
+        (Permission.user_id == user.id) | (Permission.role_id.in_(role_ids)),
+        Permission.level != PermissionLevel.NONE
+    ).first()
+    
+    if not permission:
+        logger.warning(f"User {user.email} denied access to {path}")
+        raise HTTPException(status_code=403, detail="Access Denied")
+    
+    return user
+
+
 # --- 5. LOCALIZATION FILTERS ---
 def format_num(value, lang_code="en"):
     """
@@ -250,7 +285,7 @@ async def logout(request: Request):
 async def user_settings_page(
     request: Request,
     accept_language: str = Header(None),
-    user: User = Depends(login_required),
+    user: User = Depends(check_page_permission),
     db: Session = Depends(get_db),
 ):
     t = get_text(accept_language)
@@ -264,7 +299,7 @@ async def user_settings_page(
 async def user_change_username_page(
     request: Request,
     accept_language: str = Header(None),
-    user: User = Depends(login_required),
+    user: User = Depends(check_page_permission),
 ):
     t = get_text(accept_language)
     return templates.TemplateResponse(request, "user_change_username.html", {"t": t, "user": user})
@@ -296,7 +331,7 @@ async def user_change_username(
 async def user_change_password_page(
     request: Request,
     accept_language: str = Header(None),
-    user: User = Depends(login_required),
+    user: User = Depends(check_page_permission),
 ):
     t = get_text(accept_language)
     return templates.TemplateResponse(request, "user_change_password.html", {"t": t, "user": user})
@@ -362,7 +397,7 @@ async def upload_photo(
 async def system_settings_page(
     request: Request,
     accept_language: str = Header(None),
-    user: User = Depends(login_required),
+    user: User = Depends(check_page_permission),
     db: Session = Depends(get_db),
 ):
     # Future: check for admin permissions here
@@ -531,7 +566,7 @@ async def change_password(
 async def list_users(
     request: Request,
     accept_language: str = Header(None),
-    user: User = Depends(login_required),
+    user: User = Depends(check_page_permission),
     db: Session = Depends(get_db)
 ):
     # In a real app, you'd check if user is an admin
@@ -580,7 +615,7 @@ async def update_user(
 
 
 @app.get("/admin/role", tags=[PageType.MAINTENANCE])
-async def redirect_to_roles():
+async def redirect_to_roles(user: User = Depends(check_page_permission)):
     return RedirectResponse(url="/admin/roles", status_code=303)
 
 
@@ -588,7 +623,7 @@ async def redirect_to_roles():
 async def list_roles(
     request: Request,
     accept_language: str = Header(None),
-    user: User = Depends(login_required),
+    user: User = Depends(check_page_permission),
     db: Session = Depends(get_db)
 ):
     t = get_text(accept_language)
@@ -673,7 +708,7 @@ async def delete_user(
     return RedirectResponse(url="/admin/users", status_code=303)
 
 @app.get("/admin/securities", response_class=HTMLResponse, tags=[PageType.MAINTENANCE])
-async def maintenance_securities(request: Request, accept_language: str = Header(None), user: User = Depends(login_required)):
+async def maintenance_securities(request: Request, accept_language: str = Header(None), user: User = Depends(check_page_permission)):
     t = get_text(accept_language)
     return templates.TemplateResponse(request, "admin_securities.html", {"t": t, "user": user})
 
@@ -681,7 +716,7 @@ async def maintenance_securities(request: Request, accept_language: str = Header
 async def list_permissions(
     request: Request,
     accept_language: str = Header(None),
-    user: User = Depends(login_required),
+    user: User = Depends(check_page_permission),
     db: Session = Depends(get_db)
 ):
     t = get_text(accept_language)
