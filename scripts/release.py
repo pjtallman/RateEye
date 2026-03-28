@@ -31,7 +31,7 @@ def get_milestone_for_branch(branch):
             pass
     
     # Fallback: List open milestones and look for a fuzzy match in branch name
-    milestones_json = run("gh milestone list --state open --json title")
+    milestones_json = run("gh issue milestone list --state open --json title")
     try:
         milestones = json.loads(milestones_json)
         for m in milestones:
@@ -109,7 +109,7 @@ def main():
     # 6. Milestone
     if milestone:
         print(f"[6/6] Closing milestone '{milestone}'...")
-        run(f"gh milestone edit '{milestone}' --state closed")
+        run(f"gh issue milestone edit '{milestone}' --state closed")
     else:
         print("[6/6] No milestone detected to close. Skipping.")
 

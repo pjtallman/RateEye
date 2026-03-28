@@ -59,7 +59,7 @@ def main():
 
     # 1. Milestone
     print(f"[1/4] Creating GitHub Milestone '{milestone_name}'...")
-    run(f"gh milestone create --title '{milestone_name}' --description '{milestone_desc}'", check=False)
+    run(f"gh issue milestone create --title '{milestone_name}' --description '{milestone_desc}'", check=False)
 
     # 2. Branch
     print(f"[2/4] Creating local branch '{branch_name}'...")
