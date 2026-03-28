@@ -84,6 +84,11 @@ def test_user(db):
         is_authorized=True,
         force_password_change=False
     )
+    # Give it User role
+    user_role = db.query(Role).filter(Role.name == "User").first()
+    if user_role:
+        user.roles.append(user_role)
+    
     db.add(user)
     db.commit()
     db.refresh(user)

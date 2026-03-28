@@ -442,11 +442,12 @@ async def show_log(request: Request, accept_language: str = Header(None), user: 
 async def about_page(
     request: Request,
     accept_language: str = Header(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: Optional[User] = Depends(get_current_user)
 ):
     t = get_text(accept_language)
     version = get_system_setting(db, "version", "Unknown")
-    return templates.TemplateResponse(request, "about.html", {"t": t, "version": version})
+    return templates.TemplateResponse(request, "about.html", {"t": t, "version": version, "user": user})
 
 
 # --- 7. OAUTH2 SETUP ---
@@ -588,6 +589,36 @@ async def admin_force_password_change(
         status_msg = "forced" if target_user.force_password_change else "cleared"
         logger.info(f"Password change {status_msg} for user {target_user.email} by {user.email}")
     
+    return RedirectResponse(url="/admin/users", status_code=303)
+
+
+@app.post("/admin/users/create", tags=[PageType.MAINTENANCE])
+async def create_user(
+    username: str = Form(...),
+    email: str = Form(...),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    # Security best practice: User MUST change password on first login.
+    # Instruction: Make the initial password the username.
+    initial_password = get_password_hash(username)
+    
+    new_user = User(
+        username=username,
+        email=email,
+        hashed_password=initial_password,
+        is_authorized=True,
+        force_password_change=True
+    )
+    
+    # Assign "User" role
+    user_role = db.query(Role).filter(Role.name == "User").first()
+    if user_role:
+        new_user.roles.append(user_role)
+        
+    db.add(new_user)
+    db.commit()
+    logger.info(f"New user {username} ({email}) created by {user.email}")
     return RedirectResponse(url="/admin/users", status_code=303)
 
 

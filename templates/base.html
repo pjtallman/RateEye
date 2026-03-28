@@ -29,6 +29,7 @@
             </div>
         </div>
 
+        {% if user and 'Admin' in user.roles | map(attribute='name') %}
         <div class="menu-item">{{ t.menu_admin or 'Admin' }}
             <div class="dropdown">
                 <div data-href="/admin/roles">{{ t.item_roles or 'Roles' }}</div>
@@ -39,6 +40,7 @@
                 <div data-href="/settings/system">{{ t.item_system_settings }}</div>
             </div>
         </div>
+        {% endif %}
 
         <div class="menu-item">{{ t.menu_help }}
             <div class="dropdown">
