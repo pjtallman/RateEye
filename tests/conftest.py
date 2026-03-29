@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 # Must set this before importing app or database
 os.environ["DATABASE_URL"] = "sqlite:///./test_rateeye.db"
 
-from database import Base, get_db, User, UserSetting, SystemSetting, Role, pwd_context, user_roles
+from database import Base, get_db, User, UserSetting, SystemSetting, Role, pwd_context, user_roles, Security
 from main import app
 
 # Test database setup
@@ -53,6 +53,7 @@ def db():
     # Clear users and user_roles, but keep Roles.
     session.execute(user_roles.delete())
     session.query(User).delete()
+    session.query(Security).delete()
     session.commit()
 
     yield session

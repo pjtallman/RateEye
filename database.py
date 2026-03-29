@@ -22,6 +22,22 @@ class PermissionLevel(str, Enum):
     FULL = "Full"
     NONE = "None"
 
+class SecurityType(str, Enum):
+    STOCK = "Stock"
+    BOND = "Bond"
+    MUTUAL_FUND = "Mutual Fund"
+    ETF = "ETF"
+    MONEY_MARKET = "Money Market"
+
+class AssetClass(str, Enum):
+    LARGE_CAP_STOCK = "Large Cap Stock"
+    SMALL_CAP_STOCK = "Small Cap Stock"
+    INTERNATIONAL_STOCK = "International Stock"
+    DOMESTIC_BOND = "Domestic Bond"
+    INTERNATIONAL_BOND = "International Bond"
+    MONEY_MARKET = "Money Market"
+    CASH = "Cash"
+
 # Many-to-Many Association Table
 user_roles = Table(
     "user_roles",
@@ -55,6 +71,23 @@ class Permission(Base):
 
     role = relationship("Role", back_populates="permissions")
     user = relationship("User", back_populates="permissions")
+
+class Security(Base):
+    __tablename__ = "securities"
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=False)
+    security_type = Column(SQLEnum(SecurityType), nullable=False)
+    asset_class = Column(SQLEnum(AssetClass), nullable=True) # Optional as requested
+    
+    previous_close = Column(String, nullable=True)
+    open_price = Column(String, nullable=True)
+    current_price = Column(String, nullable=True)
+    nav = Column(String, nullable=True)
+    range_52_week = Column(String, nullable=True)
+    avg_volume = Column(String, nullable=True)
+    yield_30_day = Column(String, nullable=True)
+    yield_7_day = Column(String, nullable=True)
 
 class Role(Base):
     __tablename__ = "roles"
@@ -124,7 +157,7 @@ def init_db(db: Session = None):
     # Identify unique pages from database.py get_pages()
     pages_list = get_pages()
 
-    admin_menu_pages = ["/admin/roles", "/admin/permissions", "/admin/users", "/settings/system"]
+    admin_menu_pages = ["/admin/roles", "/admin/permissions", "/admin/users", "/settings/system", "/admin/securities"]
 
     # Clear old type-based permissions to avoid confusion during this migration
     db.query(Permission).filter(Permission.page_path == None).delete()

@@ -27,7 +27,7 @@ from authlib.integrations.starlette_client import OAuth
 
 # Local Imports
 from i18n import get_text
-from database import User, UserSetting, SystemSetting, Role, user_roles, engine, SessionLocal, get_db, init_db, get_system_setting, PageType, Permission, PermissionLevel, get_pages
+from database import User, UserSetting, SystemSetting, Role, user_roles, engine, SessionLocal, get_db, init_db, get_system_setting, PageType, Permission, PermissionLevel, get_pages, Security, SecurityType, AssetClass
 
 # --- 1. LOGGING & ENVIRONMENT SETUP ---
 LOG_DIR = "logs"
@@ -739,9 +739,111 @@ async def delete_user(
     return RedirectResponse(url="/admin/users", status_code=303)
 
 @app.get("/admin/securities", response_class=HTMLResponse, tags=[PageType.MAINTENANCE])
-async def maintenance_securities(request: Request, accept_language: str = Header(None), user: User = Depends(check_page_permission)):
+async def list_securities(
+    request: Request,
+    accept_language: str = Header(None),
+    user: User = Depends(check_page_permission),
+    db: Session = Depends(get_db)
+):
     t = get_text(accept_language)
-    return templates.TemplateResponse(request, "admin_securities.html", {"t": t, "user": user})
+    securities = db.query(Security).all()
+    return templates.TemplateResponse(
+        request, 
+        "admin_securities.html", 
+        {
+            "t": t, 
+            "user": user, 
+            "securities": securities,
+            "security_types": list(SecurityType),
+            "asset_classes": list(AssetClass)
+        }
+    )
+
+@app.post("/admin/securities/create", tags=[PageType.MAINTENANCE])
+async def create_security(
+    symbol: str = Form(...),
+    name: str = Form(...),
+    security_type: SecurityType = Form(...),
+    asset_class: Optional[AssetClass] = Form(None),
+    previous_close: Optional[str] = Form(None),
+    open_price: Optional[str] = Form(None),
+    current_price: Optional[str] = Form(None),
+    nav: Optional[str] = Form(None),
+    range_52_week: Optional[str] = Form(None),
+    avg_volume: Optional[str] = Form(None),
+    yield_30_day: Optional[str] = Form(None),
+    yield_7_day: Optional[str] = Form(None),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    new_sec = Security(
+        symbol=symbol,
+        name=name,
+        security_type=security_type,
+        asset_class=asset_class,
+        previous_close=previous_close,
+        open_price=open_price,
+        current_price=current_price,
+        nav=nav,
+        range_52_week=range_52_week,
+        avg_volume=avg_volume,
+        yield_30_day=yield_30_day,
+        yield_7_day=yield_7_day
+    )
+    db.add(new_sec)
+    db.commit()
+    logger.info(f"Security {symbol} created by {user.email}")
+    return RedirectResponse(url="/admin/securities", status_code=303)
+
+@app.post("/admin/securities/update/{sec_id}", tags=[PageType.MAINTENANCE])
+async def update_security(
+    sec_id: int,
+    symbol: str = Form(...),
+    name: str = Form(...),
+    security_type: SecurityType = Form(...),
+    asset_class: Optional[AssetClass] = Form(None),
+    previous_close: Optional[str] = Form(None),
+    open_price: Optional[str] = Form(None),
+    current_price: Optional[str] = Form(None),
+    nav: Optional[str] = Form(None),
+    range_52_week: Optional[str] = Form(None),
+    avg_volume: Optional[str] = Form(None),
+    yield_30_day: Optional[str] = Form(None),
+    yield_7_day: Optional[str] = Form(None),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    sec = db.query(Security).filter(Security.id == sec_id).first()
+    if sec:
+        sec.symbol = symbol
+        sec.name = name
+        sec.security_type = security_type
+        sec.asset_class = asset_class
+        sec.previous_close = previous_close
+        sec.open_price = open_price
+        sec.current_price = current_price
+        sec.nav = nav
+        sec.range_52_week = range_52_week
+        sec.avg_volume = avg_volume
+        sec.yield_30_day = yield_30_day
+        sec.yield_7_day = yield_7_day
+        db.commit()
+        logger.info(f"Security {symbol} (ID: {sec_id}) updated by {user.email}")
+    return RedirectResponse(url="/admin/securities", status_code=303)
+
+@app.post("/admin/securities/delete/{sec_id}", tags=[PageType.MAINTENANCE])
+async def delete_security(
+    sec_id: int,
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    sec = db.query(Security).filter(Security.id == sec_id).first()
+    if sec:
+        symbol = sec.symbol
+        db.delete(sec)
+        db.commit()
+        logger.info(f"Security {symbol} deleted by {user.email}")
+    return RedirectResponse(url="/admin/securities", status_code=303)
 
 @app.get("/admin/permissions", response_class=HTMLResponse, tags=[PageType.MAINTENANCE])
 async def list_permissions(

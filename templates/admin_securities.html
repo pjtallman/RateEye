@@ -1,7 +1,142 @@
 {% extends "base.html" %}
 
-{% block title %}{{ t.item_securities or 'Securities' }}{% endblock %}
+{% block title %}{{ t.heading_securities }}{% endblock %}
 
 {% block content %}
-    <h1>{{ t.msg_securities_coming_soon }}</h1>
+    <style>
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; cursor: pointer; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 0.85em; }
+        th { background-color: #f4f4f4; white-space: nowrap; }
+        
+        .selected-row {
+            background-color: #e0f0ff !important;
+            outline: 2px solid #007bff;
+        }
+        
+        tr:hover:not(.selected-row) { background-color: #f9f9f9; }
+
+        .action-bar {
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .left-actions, .right-actions { display: flex; gap: 10px; }
+
+        .btn-action {
+            padding: 8px 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            background-color: #f4f4f4;
+            border-radius: 4px;
+        }
+
+        .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-delete { color: #c00; }
+        .btn-edit { color: #007bff; }
+        .btn-save { color: #28a745; border-color: #28a745; }
+        .btn-cancel { color: #6c757d; }
+        .btn-new { color: #28a745; border-color: #28a745; }
+
+        input.edit-input { width: 90%; padding: 4px; font-size: 1em; }
+        select.edit-input { width: 100%; padding: 4px; }
+    </style>
+
+    <h1>{{ t.heading_securities }}</h1>
+
+    <div class="action-bar">
+        <div class="left-actions">
+            <button id="btn-new" class="btn-action btn-new">{{ t.btn_new_security }}</button>
+            <button id="btn-edit" class="btn-action btn-edit">{{ t.btn_edit }}</button>
+            <button id="btn-delete" class="btn-action btn-delete">{{ t.btn_delete }}</button>
+        </div>
+        <div class="right-actions">
+            <button id="btn-save" class="btn-action btn-save" disabled>{{ t.btn_save }}</button>
+            <button id="btn-cancel" class="btn-action btn-cancel" disabled>{{ t.btn_cancel }}</button>
+        </div>
+    </div>
+
+    <div style="overflow-x: auto;">
+        <table id="securities-table">
+            <thead>
+                <tr>
+                    <th>{{ t.th_symbol }}</th>
+                    <th>{{ t.th_name }}</th>
+                    <th>{{ t.th_type }}</th>
+                    <th>{{ t.th_asset_class }}</th>
+                    <th>{{ t.th_prev_close }}</th>
+                    <th>{{ t.th_open }}</th>
+                    <th>{{ t.th_price }}</th>
+                    <th>{{ t.th_nav }}</th>
+                    <th>{{ t.th_range }}</th>
+                    <th>{{ t.th_volume }}</th>
+                    <th>{{ t.th_yield_30d }}</th>
+                    <th>{{ t.th_yield_7d }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in securities %}
+                <tr data-id="{{ s.id }}" 
+                    data-symbol="{{ s.symbol }}"
+                    data-name="{{ s.name }}"
+                    data-type="{{ s.security_type.value }}"
+                    data-asset-class="{{ s.asset_class.value if s.asset_class else '' }}"
+                    data-prev-close="{{ s.previous_close or '' }}"
+                    data-open="{{ s.open_price or '' }}"
+                    data-price="{{ s.current_price or '' }}"
+                    data-nav="{{ s.nav or '' }}"
+                    data-range="{{ s.range_52_week or '' }}"
+                    data-volume="{{ s.avg_volume or '' }}"
+                    data-yield30="{{ s.yield_30_day or '' }}"
+                    data-yield7="{{ s.yield_7_day or '' }}">
+                    <td class="col-symbol">{{ s.symbol }}</td>
+                    <td class="col-name">{{ s.name }}</td>
+                    <td class="col-type">{{ s.security_type.value }}</td>
+                    <td class="col-asset-class">{{ s.asset_class.value if s.asset_class else '' }}</td>
+                    <td class="col-prev-close">{{ s.previous_close or '' }}</td>
+                    <td class="col-open">{{ s.open_price or '' }}</td>
+                    <td class="col-price">{{ s.current_price or '' }}</td>
+                    <td class="col-nav">{{ s.nav or '' }}</td>
+                    <td class="col-range">{{ s.range_52_week or '' }}</td>
+                    <td class="col-volume">{{ s.avg_volume or '' }}</td>
+                    <td class="col-yield30">{{ s.yield_30_day or '' }}</td>
+                    <td class="col-yield7">{{ s.yield_7_day or '' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Hidden form -->
+    <form id="action-form" method="post" style="display:none;">
+        <input type="hidden" name="symbol" id="form-symbol">
+        <input type="hidden" name="name" id="form-name">
+        <input type="hidden" name="security_type" id="form-type">
+        <input type="hidden" name="asset_class" id="form-asset-class">
+        <input type="hidden" name="previous_close" id="form-prev-close">
+        <input type="hidden" name="open_price" id="form-open">
+        <input type="hidden" name="current_price" id="form-price">
+        <input type="hidden" name="nav" id="form-nav">
+        <input type="hidden" name="range_52_week" id="form-range">
+        <input type="hidden" name="avg_volume" id="form-volume">
+        <input type="hidden" name="yield_30_day" id="form-yield30">
+        <input type="hidden" name="yield_7_day" id="form-yield7">
+    </form>
+
+    <div id="type-options" style="display:none;">
+        {% for st in security_types %}
+        <option value="{{ st.value }}">{{ st.value }}</option>
+        {% endfor %}
+    </div>
+
+    <div id="asset-class-options" style="display:none;">
+        <option value="">-- Select Asset Class --</option>
+        {% for ac in asset_classes %}
+        <option value="{{ ac.value }}">{{ ac.value }}</option>
+        {% endfor %}
+    </div>
+
+    <script src="/static/js/admin_securities.js"></script>
 {% endblock %}
