@@ -28,6 +28,7 @@ from authlib.integrations.starlette_client import OAuth
 # Local Imports
 from i18n import get_text
 from database import User, UserSetting, SystemSetting, Role, user_roles, engine, SessionLocal, get_db, init_db, get_system_setting, PageType, Permission, PermissionLevel, get_pages, Security, SecurityType, AssetClass
+from src.rateeye.securities.scraper import YahooFinanceScraper
 
 # --- 1. LOGGING & ENVIRONMENT SETUP ---
 LOG_DIR = "logs"
@@ -49,6 +50,31 @@ def rotate_logs():
 
 rotate_logs()
 
+def load_metadata(activity_name: str, model_class=None) -> dict:
+    """Loads metadata for a maintenance activity from metadata/[name]_maint_activity_metadata.json or metadata/[name].json."""
+    paths = [
+        os.path.join("metadata", f"{activity_name}_maint_activity_metadata.json"),
+        os.path.join("metadata", f"{activity_name}.json")
+    ]
+    for path in paths:
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                return json.load(f)
+    
+    # Fallback to model-derived defaults
+    if model_class:
+        from sqlalchemy import inspect
+        columns = [c.key for c in inspect(model_class).mapper.column_attrs if c.key != 'id']
+        return {
+            "browse_panel": {
+                "columns": [{"name": c, "label_key": f"th_{c}"} for c in columns]
+            },
+            "maintenance_panel": {
+                "buttons": ["new", "edit", "delete"],
+                "fields": [{"name": c, "label_key": f"label_{c}", "read_only": False} for c in columns]
+            }
+        }
+    return {}
 if not IS_TESTING:
     logging.basicConfig(
         level=logging.INFO,
@@ -133,16 +159,22 @@ async def check_page_permission(
     
     path = request.url.path
     role_ids = [role.id for role in user.roles]
-    
-    # Query for any permission that grants access
-    # FULL or any CRUD level (READ, CREATE, UPDATE, DELETE)
-    # NONE is excluded by the filter on level
+
+    # Sub-path support: Try exact path first, then parent paths
+    # e.g. /admin/securities/search will check /admin/securities
+    potential_paths = [path]
+    parts = path.strip("/").split("/")
+    while len(parts) > 1:
+        parts.pop()
+        potential_paths.append("/" + "/".join(parts))
+
+    # Query for any permission that grants access to these paths
     permission = db.query(Permission).filter(
-        Permission.page_path == path,
+        Permission.page_path.in_(potential_paths),
         (Permission.user_id == user.id) | (Permission.role_id.in_(role_ids)),
         Permission.level != PermissionLevel.NONE
-    ).first()
-    
+    ).first()    
+
     if not permission:
         logger.warning(f"User {user.email} denied access to {path}")
         raise HTTPException(status_code=403, detail="Access Denied")
@@ -747,15 +779,17 @@ async def list_securities(
 ):
     t = get_text(accept_language)
     securities = db.query(Security).all()
+    metadata = load_metadata("securities", model_class=Security)
     return templates.TemplateResponse(
-        request, 
-        "admin_securities.html", 
+        request,
+        "admin_securities.html",
         {
-            "t": t, 
-            "user": user, 
-            "securities": securities,
-            "security_types": list(SecurityType),
-            "asset_classes": list(AssetClass)
+            "t": t,
+            "title": t.get("item_securities", "Securities"),
+            "user": user,
+            "securities": securities,            "security_types": list(SecurityType),
+            "asset_classes": list(AssetClass),
+            "metadata": metadata
         }
     )
 
@@ -844,6 +878,29 @@ async def delete_security(
         db.commit()
         logger.info(f"Security {symbol} deleted by {user.email}")
     return RedirectResponse(url="/admin/securities", status_code=303)
+
+
+@app.get("/admin/securities/search", tags=[PageType.MAINTENANCE])
+async def search_securities(
+    q: str,
+    user: User = Depends(check_page_permission)
+):
+    scraper = YahooFinanceScraper()
+    results = await scraper.search(q)
+    return results
+
+
+@app.get("/admin/securities/lookup", tags=[PageType.MAINTENANCE])
+async def lookup_security(
+    symbol: str,
+    user: User = Depends(check_page_permission)
+):
+    scraper = YahooFinanceScraper()
+    data = await scraper.lookup(symbol)
+    if not data:
+        raise HTTPException(status_code=404, detail="Security not found")
+    return data
+
 
 @app.get("/admin/permissions", response_class=HTMLResponse, tags=[PageType.MAINTENANCE])
 async def list_permissions(

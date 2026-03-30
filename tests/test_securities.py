@@ -23,6 +23,19 @@ def test_securities_list_basic(client, test_admin, db):
     assert "Test Security" in resp.text
     assert AssetClass.LARGE_CAP_STOCK.value in resp.text
 
+def test_maintenance_layout_elements(client, test_admin, db):
+    init_db(db)
+    client.post("/login", data={"email": test_admin.email, "password": "adminpassword"}, follow_redirects=False)
+    
+    resp = client.get("/admin/securities")
+    assert resp.status_code == 200
+    assert 'class="browse-panel"' in resp.text
+    assert 'class="maintenance-panel"' in resp.text
+    assert 'class="advanced-search-panel"' in resp.text
+    assert 'class="action-panel"' in resp.text
+    assert 'class="maintenance-form"' in resp.text
+    assert 'class="save-panel"' in resp.text
+
 def test_securities_crud(client, test_admin, db):
     init_db(db)
     # Log in as admin

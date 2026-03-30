@@ -1,181 +1,178 @@
-"use strict";
-document.addEventListener('DOMContentLoaded', () => {
-    var _a, _b;
-    let selectedRow = null;
-    let isEditing = false;
-    let isNew = false;
-    const tableBody = document.querySelector('#securities-table tbody');
-    const btnNew = document.getElementById('btn-new');
-    const btnEdit = document.getElementById('btn-edit');
-    const btnSave = document.getElementById('btn-save');
-    const btnCancel = document.getElementById('btn-cancel');
-    const btnDelete = document.getElementById('btn-delete');
-    const actionForm = document.getElementById('action-form');
-    const typeOptions = ((_a = document.getElementById('type-options')) === null || _a === void 0 ? void 0 : _a.innerHTML) || '';
-    const assetClassOptions = ((_b = document.getElementById('asset-class-options')) === null || _b === void 0 ? void 0 : _b.innerHTML) || '';
-    function selectRow(row) {
-        if (selectedRow === row)
-            return;
-        if (isEditing || isNew) {
-            if (!confirm("Discard unsaved changes?"))
-                return;
-            cancelEdit();
-        }
-        if (selectedRow)
-            selectedRow.classList.remove('selected-row');
-        selectedRow = row;
-        selectedRow.classList.add('selected-row');
-        updateButtonStates();
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+import { MaintenanceActivityManager } from './maintenance_activity.js';
+class SecuritiesManager extends MaintenanceActivityManager {
+    constructor(metadata) {
+        super(metadata);
+        this.lookupModal = document.getElementById('lookup-modal');
+        this.lookupResultsList = document.getElementById('lookup-results-list');
+        this.lookupResultsCount = document.getElementById('lookup-results-count');
+        this.lookupSearchInput = document.getElementById('lookup-search-input');
+        this.btnLookupSearch = document.getElementById('btn-lookup-search');
+        this.btnCloseLookup = document.getElementById('btn-close-lookup');
+        this.initLookupListeners();
     }
-    function updateButtonStates() {
-        btnEdit.disabled = !selectedRow || isEditing || isNew;
-        btnDelete.disabled = !selectedRow || isEditing || isNew;
-        btnNew.disabled = isEditing || isNew;
-        checkChanges();
+    initLookupListeners() {
+        var _a, _b, _c;
+        const lookupButtons = document.querySelectorAll('.btn-lookup');
+        lookupButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openLookupDialog();
+            });
+        });
+        (_a = this.btnLookupSearch) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => this.handleLookup());
+        (_b = this.btnCloseLookup) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => {
+            this.lookupModal.style.display = 'none';
+        });
+        // Allow Enter key in lookup search
+        (_c = this.lookupSearchInput) === null || _c === void 0 ? void 0 : _c.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.handleLookup();
+            }
+        });
     }
-    function checkChanges() {
-        if (!selectedRow || (!isEditing && !isNew)) {
-            btnSave.disabled = true;
-            btnCancel.disabled = true;
-            return;
-        }
-        btnSave.disabled = false;
-        btnCancel.disabled = false;
-    }
-    function handleNew() {
-        isNew = true;
-        if (selectedRow)
-            selectedRow.classList.remove('selected-row');
-        const tr = document.createElement('tr');
-        tr.id = 'temp-row';
-        tr.innerHTML = `
-            <td><input type="text" class="edit-input" placeholder="Symbol"></td>
-            <td><input type="text" class="edit-input" placeholder="Name"></td>
-            <td><select class="edit-input">${typeOptions}</select></td>
-            <td><select class="edit-input">${assetClassOptions}</select></td>
-            <td><input type="text" class="edit-input"></td>
-            <td><input type="text" class="edit-input"></td>
-            <td><input type="text" class="edit-input"></td>
-            <td><input type="text" class="edit-input"></td>
-            <td><input type="text" class="edit-input"></td>
-            <td><input type="text" class="edit-input"></td>
-            <td><input type="text" class="edit-input"></td>
-            <td><input type="text" class="edit-input"></td>
-        `;
-        tableBody === null || tableBody === void 0 ? void 0 : tableBody.prepend(tr);
-        selectedRow = tr;
-        selectedRow.classList.add('selected-row');
-        updateButtonStates();
-    }
-    function handleEdit() {
-        if (!selectedRow)
-            return;
-        isEditing = true;
-        const d = selectedRow.dataset;
-        const cells = selectedRow.cells;
-        cells[0].innerHTML = `<input type="text" class="edit-input" value="${d.symbol}">`;
-        cells[1].innerHTML = `<input type="text" class="edit-input" value="${d.name}">`;
-        cells[2].innerHTML = `<select class="edit-input">${typeOptions}</select>`;
-        cells[2].querySelector('select').value = d.type;
-        cells[3].innerHTML = `<select class="edit-input">${assetClassOptions}</select>`;
-        cells[3].querySelector('select').value = d.assetClass;
-        cells[4].innerHTML = `<input type="text" class="edit-input" value="${d.prevClose}">`;
-        cells[5].innerHTML = `<input type="text" class="edit-input" value="${d.open}">`;
-        cells[6].innerHTML = `<input type="text" class="edit-input" value="${d.price}">`;
-        cells[7].innerHTML = `<input type="text" class="edit-input" value="${d.nav}">`;
-        cells[8].innerHTML = `<input type="text" class="edit-input" value="${d.range}">`;
-        cells[9].innerHTML = `<input type="text" class="edit-input" value="${d.volume}">`;
-        cells[10].innerHTML = `<input type="text" class="edit-input" value="${d.yield30}">`;
-        cells[11].innerHTML = `<input type="text" class="edit-input" value="${d.yield7}">`;
-        updateButtonStates();
-    }
-    function cancelEdit() {
+    openLookupDialog() {
         var _a;
-        if (isNew) {
-            (_a = document.getElementById('temp-row')) === null || _a === void 0 ? void 0 : _a.remove();
-            isNew = false;
+        const symbolInput = document.getElementById('field-symbol');
+        if (this.lookupSearchInput && symbolInput) {
+            this.lookupSearchInput.value = symbolInput.value;
         }
-        else if (isEditing && selectedRow) {
-            const d = selectedRow.dataset;
-            selectedRow.cells[0].textContent = d.symbol;
-            selectedRow.cells[1].textContent = d.name;
-            selectedRow.cells[2].textContent = d.type;
-            selectedRow.cells[3].textContent = d.assetClass;
-            selectedRow.cells[4].textContent = d.prevClose;
-            selectedRow.cells[5].textContent = d.open;
-            selectedRow.cells[6].textContent = d.price;
-            selectedRow.cells[7].textContent = d.nav;
-            selectedRow.cells[8].textContent = d.range;
-            selectedRow.cells[9].textContent = d.volume;
-            selectedRow.cells[10].textContent = d.yield30;
-            selectedRow.cells[11].textContent = d.yield7;
-            isEditing = false;
+        if (this.lookupResultsList) {
+            this.lookupResultsList.innerHTML = '';
         }
-        const firstRow = document.querySelector('#securities-table tbody tr:not(#temp-row)');
-        if (firstRow) {
-            selectedRow = null;
-            selectRow(firstRow);
+        if (this.lookupResultsCount) {
+            this.lookupResultsCount.textContent = '';
         }
-        updateButtonStates();
+        if (this.lookupModal) {
+            this.lookupModal.style.display = 'flex';
+            (_a = this.lookupSearchInput) === null || _a === void 0 ? void 0 : _a.focus();
+        }
     }
-    function handleSave() {
-        if (!selectedRow)
-            return;
-        const inputs = selectedRow.querySelectorAll('input, select');
-        const data = {
-            symbol: inputs[0].value,
-            name: inputs[1].value,
-            type: inputs[2].value,
-            assetClass: inputs[3].value,
-            prevClose: inputs[4].value,
-            open: inputs[5].value,
-            price: inputs[6].value,
-            nav: inputs[7].value,
-            range: inputs[8].value,
-            volume: inputs[9].value,
-            yield30: inputs[10].value,
-            yield7: inputs[11].value,
-        };
-        if (isNew) {
-            actionForm.action = '/admin/securities/create';
+    handleLookup() {
+        return __awaiter(this, void 0, void 0, function* () {
+            var _a;
+            let query = (_a = this.lookupSearchInput) === null || _a === void 0 ? void 0 : _a.value.trim();
+            if (!query) {
+                alert("Please enter a symbol or name to lookup.");
+                return;
+            }
+            try {
+                this.lookupResultsList.innerHTML = '<tr><td colspan="2" style="padding: 15px;">Searching...</td></tr>';
+                this.lookupResultsCount.textContent = '';
+                // Requirement (1): Exact match first
+                let results = yield this.performSearch(query);
+                // Requirement (1): If no records, then starts with search
+                if (results.length === 0 && !query.endsWith('*')) {
+                    results = yield this.performSearch(query + '*');
+                }
+                this.showLookupResults(results);
+            }
+            catch (err) {
+                if (err.message.includes("429") || err.message.includes("Rate limited")) {
+                    this.lookupResultsList.innerHTML = '<tr><td colspan="2" style="padding: 15px; color: #c00;">Error: Too many requests. Yahoo Finance is rate-limiting our search. Please try again later.</td></tr>';
+                }
+                else {
+                    this.lookupResultsList.innerHTML = `<tr><td colspan="2" style="padding: 15px; color: #c00;">Error searching for security: ${err.message}</td></tr>`;
+                }
+            }
+        });
+    }
+    performSearch(q) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const resp = yield fetch(`/admin/securities/search?q=${encodeURIComponent(q)}`);
+            if (resp.status === 429) {
+                throw new Error("Rate limited");
+            }
+            if (!resp.ok) {
+                throw new Error(`Search failed with status ${resp.status}`);
+            }
+            return yield resp.json();
+        });
+    }
+    showLookupResults(results) {
+        this.lookupResultsList.innerHTML = '';
+        // Display count of matching records
+        if (this.lookupResultsCount) {
+            this.lookupResultsCount.textContent = `Found ${results.length} record(s)`;
+        }
+        if (results.length === 0) {
+            this.lookupResultsList.innerHTML = '<tr><td colspan="2" style="padding: 15px;">No results found.</td></tr>';
         }
         else {
-            actionForm.action = `/admin/securities/update/${selectedRow.dataset.id}`;
-        }
-        document.getElementById('form-symbol').value = data.symbol;
-        document.getElementById('form-name').value = data.name;
-        document.getElementById('form-type').value = data.type;
-        document.getElementById('form-asset-class').value = data.assetClass;
-        document.getElementById('form-prev-close').value = data.prevClose;
-        document.getElementById('form-open').value = data.open;
-        document.getElementById('form-price').value = data.price;
-        document.getElementById('form-nav').value = data.nav;
-        document.getElementById('form-range').value = data.range;
-        document.getElementById('form-volume').value = data.volume;
-        document.getElementById('form-yield30').value = data.yield30;
-        document.getElementById('form-yield7').value = data.yield7;
-        actionForm.submit();
-    }
-    function handleDelete() {
-        if (!selectedRow || isEditing || isNew)
-            return;
-        if (confirm(`Delete security ${selectedRow.dataset.symbol}?`)) {
-            actionForm.action = `/admin/securities/delete/${selectedRow.dataset.id}`;
-            actionForm.submit();
+            results.forEach(res => {
+                const tr = document.createElement('tr');
+                tr.className = 'lookup-result-row';
+                tr.innerHTML = `
+                    <td><strong>${res.symbol}</strong></td>
+                    <td>${res.name || ''}</td>
+                `;
+                tr.addEventListener('click', () => {
+                    this.fetchMetadata(res.symbol);
+                    this.lookupModal.style.display = 'none';
+                });
+                this.lookupResultsList.appendChild(tr);
+            });
         }
     }
-    tableBody === null || tableBody === void 0 ? void 0 : tableBody.addEventListener('click', (e) => {
-        const tr = e.target.closest('tr');
-        if (tr && tableBody.contains(tr) && tr.id !== 'temp-row') {
-            selectRow(tr);
-        }
-    });
-    btnNew.addEventListener('click', handleNew);
-    btnEdit.addEventListener('click', handleEdit);
-    btnSave.addEventListener('click', handleSave);
-    btnCancel.addEventListener('click', cancelEdit);
-    btnDelete.addEventListener('click', handleDelete);
-    const first = document.querySelector('#securities-table tbody tr');
-    if (first)
-        selectRow(first);
+    fetchMetadata(symbol) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                this.showMessage(`Fetching metadata for ${symbol}...`);
+                const resp = yield fetch(`/admin/securities/lookup?symbol=${encodeURIComponent(symbol)}`);
+                if (!resp.ok) {
+                    if (resp.status === 404) {
+                        throw new Error(`Security details for '${symbol}' not found on Yahoo Finance.`);
+                    }
+                    throw new Error(`Lookup failed with status ${resp.status}`);
+                }
+                const data = yield resp.json();
+                this.populateFormWithMetadata(data);
+                this.showMessage(`Successfully loaded ${symbol}`);
+            }
+            catch (err) {
+                this.showMessage(err.message || "Error fetching security metadata.", true);
+            }
+        });
+    }
+    populateFormWithMetadata(data) {
+        const mapping = {
+            'symbol': data.symbol,
+            'name': data.name,
+            'security_type': data.security_type,
+            'asset_class': data.asset_class,
+            'previous_close': data.previous_close,
+            'open_price': data.open_price,
+            'current_price': data.current_price,
+            'nav': data.nav,
+            'range_52_week': data.range_52_week,
+            'avg_volume': data.avg_volume,
+            'yield_30_day': data.yield_30_day,
+            'yield_7_day': data.yield_7_day
+        };
+        Object.keys(mapping).forEach(key => {
+            const input = document.getElementById(`field-${key}`);
+            if (input && mapping[key] !== undefined) {
+                input.value = mapping[key] || '';
+            }
+        });
+        this.checkDirty();
+    }
+    getCreateUrl() { return "/admin/securities/create"; }
+    getUpdateUrl(id) { return `/admin/securities/update/${id}`; }
+    getDeleteUrl(id) { return `/admin/securities/delete/${id}`; }
+}
+document.addEventListener('DOMContentLoaded', () => {
+    const metadataElement = document.getElementById('metadata-json');
+    if (metadataElement) {
+        const metadata = JSON.parse(metadataElement.textContent || '{}');
+        new SecuritiesManager(metadata);
+    }
 });

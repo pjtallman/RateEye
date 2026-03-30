@@ -1,4 +1,3 @@
-"use strict";
 document.addEventListener('DOMContentLoaded', () => {
     let selectedRow = null;
     let isEditing = false;
@@ -190,3 +189,4 @@ document.addEventListener('DOMContentLoaded', () => {
     if (firstRow)
         selectRow(firstRow);
 });
+export {};

@@ -1,142 +1,60 @@
-{% extends "base.html" %}
+{% extends "maintenance_activity_base.html" %}
 
-{% block title %}{{ t.heading_securities }}{% endblock %}
+{% block table_rows %}
+    {% for s in securities %}
+    <tr data-id="{{ s.id }}" 
+        {% for field in metadata.maintenance_panel.fields %}
+        data-{{ field.name | replace('_', '-') }}="{{ s[field.name].value if s[field.name] is mapping else (s[field.name] or '') }}"
+        {% endfor %}
+    >
+        {% for col in metadata.browse_panel.columns %}
+        <td>{{ s[col.name].value if s[col.name] is mapping else (s[col.name] or '') }}</td>
+        {% endfor %}
+    </tr>
+    {% endfor %}
+{% endblock %}
 
-{% block content %}
-    <style>
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; cursor: pointer; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 0.85em; }
-        th { background-color: #f4f4f4; white-space: nowrap; }
-        
-        .selected-row {
-            background-color: #e0f0ff !important;
-            outline: 2px solid #007bff;
-        }
-        
-        tr:hover:not(.selected-row) { background-color: #f9f9f9; }
-
-        .action-bar {
-            margin-bottom: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .left-actions, .right-actions { display: flex; gap: 10px; }
-
-        .btn-action {
-            padding: 8px 16px;
-            font-weight: bold;
-            cursor: pointer;
-            border: 1px solid #ccc;
-            background-color: #f4f4f4;
-            border-radius: 4px;
-        }
-
-        .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-delete { color: #c00; }
-        .btn-edit { color: #007bff; }
-        .btn-save { color: #28a745; border-color: #28a745; }
-        .btn-cancel { color: #6c757d; }
-        .btn-new { color: #28a745; border-color: #28a745; }
-
-        input.edit-input { width: 90%; padding: 4px; font-size: 1em; }
-        select.edit-input { width: 100%; padding: 4px; }
-    </style>
-
-    <h1>{{ t.heading_securities }}</h1>
-
-    <div class="action-bar">
-        <div class="left-actions">
-            <button id="btn-new" class="btn-action btn-new">{{ t.btn_new_security }}</button>
-            <button id="btn-edit" class="btn-action btn-edit">{{ t.btn_edit }}</button>
-            <button id="btn-delete" class="btn-action btn-delete">{{ t.btn_delete }}</button>
-        </div>
-        <div class="right-actions">
-            <button id="btn-save" class="btn-action btn-save" disabled>{{ t.btn_save }}</button>
-            <button id="btn-cancel" class="btn-action btn-cancel" disabled>{{ t.btn_cancel }}</button>
-        </div>
-    </div>
-
-    <div style="overflow-x: auto;">
-        <table id="securities-table">
-            <thead>
-                <tr>
-                    <th>{{ t.th_symbol }}</th>
-                    <th>{{ t.th_name }}</th>
-                    <th>{{ t.th_type }}</th>
-                    <th>{{ t.th_asset_class }}</th>
-                    <th>{{ t.th_prev_close }}</th>
-                    <th>{{ t.th_open }}</th>
-                    <th>{{ t.th_price }}</th>
-                    <th>{{ t.th_nav }}</th>
-                    <th>{{ t.th_range }}</th>
-                    <th>{{ t.th_volume }}</th>
-                    <th>{{ t.th_yield_30d }}</th>
-                    <th>{{ t.th_yield_7d }}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for s in securities %}
-                <tr data-id="{{ s.id }}" 
-                    data-symbol="{{ s.symbol }}"
-                    data-name="{{ s.name }}"
-                    data-type="{{ s.security_type.value }}"
-                    data-asset-class="{{ s.asset_class.value if s.asset_class else '' }}"
-                    data-prev-close="{{ s.previous_close or '' }}"
-                    data-open="{{ s.open_price or '' }}"
-                    data-price="{{ s.current_price or '' }}"
-                    data-nav="{{ s.nav or '' }}"
-                    data-range="{{ s.range_52_week or '' }}"
-                    data-volume="{{ s.avg_volume or '' }}"
-                    data-yield30="{{ s.yield_30_day or '' }}"
-                    data-yield7="{{ s.yield_7_day or '' }}">
-                    <td class="col-symbol">{{ s.symbol }}</td>
-                    <td class="col-name">{{ s.name }}</td>
-                    <td class="col-type">{{ s.security_type.value }}</td>
-                    <td class="col-asset-class">{{ s.asset_class.value if s.asset_class else '' }}</td>
-                    <td class="col-prev-close">{{ s.previous_close or '' }}</td>
-                    <td class="col-open">{{ s.open_price or '' }}</td>
-                    <td class="col-price">{{ s.current_price or '' }}</td>
-                    <td class="col-nav">{{ s.nav or '' }}</td>
-                    <td class="col-range">{{ s.range_52_week or '' }}</td>
-                    <td class="col-volume">{{ s.avg_volume or '' }}</td>
-                    <td class="col-yield30">{{ s.yield_30_day or '' }}</td>
-                    <td class="col-yield7">{{ s.yield_7_day or '' }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Hidden form -->
+{% block extra_scripts %}
+    <!-- Hidden form for actual submission -->
     <form id="action-form" method="post" style="display:none;">
-        <input type="hidden" name="symbol" id="form-symbol">
-        <input type="hidden" name="name" id="form-name">
-        <input type="hidden" name="security_type" id="form-type">
-        <input type="hidden" name="asset_class" id="form-asset-class">
-        <input type="hidden" name="previous_close" id="form-prev-close">
-        <input type="hidden" name="open_price" id="form-open">
-        <input type="hidden" name="current_price" id="form-price">
-        <input type="hidden" name="nav" id="form-nav">
-        <input type="hidden" name="range_52_week" id="form-range">
-        <input type="hidden" name="avg_volume" id="form-volume">
-        <input type="hidden" name="yield_30_day" id="form-yield30">
-        <input type="hidden" name="yield_7_day" id="form-yield7">
+        {% for field in metadata.maintenance_panel.fields %}
+        <input type="hidden" name="{{ field.name }}" id="form-{{ field.name | replace('_', '-') }}">
+        {% endfor %}
     </form>
 
-    <div id="type-options" style="display:none;">
-        {% for st in security_types %}
-        <option value="{{ st.value }}">{{ st.value }}</option>
-        {% endfor %}
+    <!-- Lookup Modal -->
+    <div id="lookup-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">{{ t.heading_security_lookup or 'Security Lookup' }}</div>
+            
+            <div class="modal-search-area">
+                <input type="text" id="lookup-search-input" class="edit-input" placeholder="Enter symbol or name..." style="flex: 1;">
+                <button id="btn-lookup-search" class="btn-action">Search</button>
+            </div>
+
+            <div id="lookup-results-container" style="flex: 1; overflow-y: auto;">
+                <table class="lookup-results-table">
+                    <thead>
+                        <tr>
+                            <th>{{ t.th_symbol or 'Symbol' }}</th>
+                            <th>{{ t.th_name or 'Name' }}</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lookup-results-list">
+                        <!-- Results populated here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="modal-footer" style="padding: 10px 20px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                <div id="lookup-results-count" style="font-size: 0.9em; color: #666;"></div>
+                <button class="btn-action" id="btn-close-lookup">{{ t.btn_cancel or 'Cancel' }}</button>
+            </div>
+        </div>
     </div>
 
-    <div id="asset-class-options" style="display:none;">
-        <option value="">-- Select Asset Class --</option>
-        {% for ac in asset_classes %}
-        <option value="{{ ac.value }}">{{ ac.value }}</option>
-        {% endfor %}
-    </div>
-
-    <script src="/static/js/admin_securities.js"></script>
+    <script id="metadata-json" type="application/json">
+        {{ metadata | tojson }}
+    </script>
+    <script src="/static/js/admin_securities.js" type="module"></script>
 {% endblock %}

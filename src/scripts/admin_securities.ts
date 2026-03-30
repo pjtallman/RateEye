@@ -1,212 +1,178 @@
-interface SecurityRow extends HTMLTableRowElement {
-    dataset: DOMStringMap & {
-        id: string;
-        symbol: string;
-        name: string;
-        type: string;
-        assetClass: string;
-        prevClose: string;
-        open: string;
-        price: string;
-        nav: string;
-        range: string;
-        volume: string;
-        yield30: string;
-        yield7: string;
-    };
+import { MaintenanceActivityManager, ActivityMetadata } from './maintenance_activity.js';
+
+class SecuritiesManager extends MaintenanceActivityManager {
+    private lookupModal = document.getElementById('lookup-modal') as HTMLElement;
+    private lookupResultsList = document.getElementById('lookup-results-list') as HTMLElement;
+    private lookupResultsCount = document.getElementById('lookup-results-count') as HTMLElement;
+    private lookupSearchInput = document.getElementById('lookup-search-input') as HTMLInputElement;
+    private btnLookupSearch = document.getElementById('btn-lookup-search') as HTMLButtonElement;
+    private btnCloseLookup = document.getElementById('btn-close-lookup') as HTMLButtonElement;
+
+    constructor(metadata: ActivityMetadata) {
+        super(metadata);
+        this.initLookupListeners();
+    }
+
+    private initLookupListeners() {
+        const lookupButtons = document.querySelectorAll('.btn-lookup');
+        lookupButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openLookupDialog();
+            });
+        });
+
+        this.btnLookupSearch?.addEventListener('click', () => this.handleLookup());
+        
+        this.btnCloseLookup?.addEventListener('click', () => {
+            this.lookupModal.style.display = 'none';
+        });
+
+        // Allow Enter key in lookup search
+        this.lookupSearchInput?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.handleLookup();
+            }
+        });
+    }
+
+    private openLookupDialog() {
+        const symbolInput = document.getElementById('field-symbol') as HTMLInputElement;
+        if (this.lookupSearchInput && symbolInput) {
+            this.lookupSearchInput.value = symbolInput.value;
+        }
+        if (this.lookupResultsList) {
+            this.lookupResultsList.innerHTML = '';
+        }
+        if (this.lookupResultsCount) {
+            this.lookupResultsCount.textContent = '';
+        }
+        if (this.lookupModal) {
+            this.lookupModal.style.display = 'flex';
+            this.lookupSearchInput?.focus();
+        }
+    }
+
+    private async handleLookup() {
+        let query = this.lookupSearchInput?.value.trim();
+        if (!query) {
+            alert("Please enter a symbol or name to lookup.");
+            return;
+        }
+
+        try {
+            this.lookupResultsList.innerHTML = '<tr><td colspan="2" style="padding: 15px;">Searching...</td></tr>';
+            this.lookupResultsCount.textContent = '';
+
+            // Requirement (1): Exact match first
+            let results = await this.performSearch(query);
+
+            // Requirement (1): If no records, then starts with search
+            if (results.length === 0 && !query.endsWith('*')) {
+                results = await this.performSearch(query + '*');
+            }
+
+            this.showLookupResults(results);
+        } catch (err: any) {
+            if (err.message.includes("429") || err.message.includes("Rate limited")) {
+                this.lookupResultsList.innerHTML = '<tr><td colspan="2" style="padding: 15px; color: #c00;">Error: Too many requests. Yahoo Finance is rate-limiting our search. Please try again later.</td></tr>';
+            } else {
+                this.lookupResultsList.innerHTML = `<tr><td colspan="2" style="padding: 15px; color: #c00;">Error searching for security: ${err.message}</td></tr>`;
+            }
+        }
+    }
+
+    private async performSearch(q: string): Promise<any[]> {
+        const resp = await fetch(`/admin/securities/search?q=${encodeURIComponent(q)}`);
+        if (resp.status === 429) {
+            throw new Error("Rate limited");
+        }
+        if (!resp.ok) {
+            throw new Error(`Search failed with status ${resp.status}`);
+        }
+        return await resp.json();
+    }
+
+    private showLookupResults(results: any[]) {
+        this.lookupResultsList.innerHTML = '';
+        
+        // Display count of matching records
+        if (this.lookupResultsCount) {
+            this.lookupResultsCount.textContent = `Found ${results.length} record(s)`;
+        }
+
+        if (results.length === 0) {
+            this.lookupResultsList.innerHTML = '<tr><td colspan="2" style="padding: 15px;">No results found.</td></tr>';
+        } else {
+            results.forEach(res => {
+                const tr = document.createElement('tr');
+                tr.className = 'lookup-result-row';
+                tr.innerHTML = `
+                    <td><strong>${res.symbol}</strong></td>
+                    <td>${res.name || ''}</td>
+                `;
+                tr.addEventListener('click', () => {
+                    this.fetchMetadata(res.symbol);
+                    this.lookupModal.style.display = 'none';
+                });
+                this.lookupResultsList.appendChild(tr);
+            });
+        }
+    }
+
+    private async fetchMetadata(symbol: string) {
+        try {
+            this.showMessage(`Fetching metadata for ${symbol}...`);
+            const resp = await fetch(`/admin/securities/lookup?symbol=${encodeURIComponent(symbol)}`);
+            if (!resp.ok) {
+                if (resp.status === 404) {
+                    throw new Error(`Security details for '${symbol}' not found on Yahoo Finance.`);
+                }
+                throw new Error(`Lookup failed with status ${resp.status}`);
+            }
+            const data = await resp.json();
+            this.populateFormWithMetadata(data);
+            this.showMessage(`Successfully loaded ${symbol}`);
+        } catch (err: any) {
+            this.showMessage(err.message || "Error fetching security metadata.", true);
+        }
+    }
+
+    private populateFormWithMetadata(data: any) {
+        const mapping: Record<string, any> = {
+            'symbol': data.symbol,
+            'name': data.name,
+            'security_type': data.security_type,
+            'asset_class': data.asset_class,
+            'previous_close': data.previous_close,
+            'open_price': data.open_price,
+            'current_price': data.current_price,
+            'nav': data.nav,
+            'range_52_week': data.range_52_week,
+            'avg_volume': data.avg_volume,
+            'yield_30_day': data.yield_30_day,
+            'yield_7_day': data.yield_7_day
+        };
+
+        Object.keys(mapping).forEach(key => {
+            const input = document.getElementById(`field-${key}`) as HTMLInputElement | HTMLSelectElement;
+            if (input && mapping[key] !== undefined) {
+                input.value = mapping[key] || '';
+            }
+        });
+        
+        this.checkDirty();
+    }
+
+    protected override getCreateUrl() { return "/admin/securities/create"; }
+    protected override getUpdateUrl(id: string) { return `/admin/securities/update/${id}`; }
+    protected override getDeleteUrl(id: string) { return `/admin/securities/delete/${id}`; }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    let selectedRow: SecurityRow | null = null;
-    let isEditing = false;
-    let isNew = false;
-
-    const tableBody = document.querySelector('#securities-table tbody');
-    const btnNew = document.getElementById('btn-new') as HTMLButtonElement;
-    const btnEdit = document.getElementById('btn-edit') as HTMLButtonElement;
-    const btnSave = document.getElementById('btn-save') as HTMLButtonElement;
-    const btnCancel = document.getElementById('btn-cancel') as HTMLButtonElement;
-    const btnDelete = document.getElementById('btn-delete') as HTMLButtonElement;
-    
-    const actionForm = document.getElementById('action-form') as HTMLFormElement;
-    const typeOptions = document.getElementById('type-options')?.innerHTML || '';
-    const assetClassOptions = document.getElementById('asset-class-options')?.innerHTML || '';
-
-    function selectRow(row: SecurityRow) {
-        if (selectedRow === row) return;
-        if (isEditing || isNew) {
-            if (!confirm("Discard unsaved changes?")) return;
-            cancelEdit();
-        }
-
-        if (selectedRow) selectedRow.classList.remove('selected-row');
-        selectedRow = row;
-        selectedRow.classList.add('selected-row');
-        updateButtonStates();
+    const metadataElement = document.getElementById('metadata-json');
+    if (metadataElement) {
+        const metadata = JSON.parse(metadataElement.textContent || '{}');
+        new SecuritiesManager(metadata);
     }
-
-    function updateButtonStates() {
-        btnEdit.disabled = !selectedRow || isEditing || isNew;
-        btnDelete.disabled = !selectedRow || isEditing || isNew;
-        btnNew.disabled = isEditing || isNew;
-        checkChanges();
-    }
-
-    function checkChanges() {
-        if (!selectedRow || (!isEditing && !isNew)) {
-            btnSave.disabled = true;
-            btnCancel.disabled = true;
-            return;
-        }
-        btnSave.disabled = false;
-        btnCancel.disabled = false;
-    }
-
-    function handleNew() {
-        isNew = true;
-        if (selectedRow) selectedRow.classList.remove('selected-row');
-        
-        const tr = document.createElement('tr') as SecurityRow;
-        tr.id = 'temp-row';
-        tr.innerHTML = `
-            <td><input type="text" class="edit-input" placeholder="Symbol"></td>
-            <td><input type="text" class="edit-input" placeholder="Name"></td>
-            <td><select class="edit-input">${typeOptions}</select></td>
-            <td><select class="edit-input">${assetClassOptions}</select></td>
-            <td><input type="text" class="edit-input"></td>
-            <td><input type="text" class="edit-input"></td>
-            <td><input type="text" class="edit-input"></td>
-            <td><input type="text" class="edit-input"></td>
-            <td><input type="text" class="edit-input"></td>
-            <td><input type="text" class="edit-input"></td>
-            <td><input type="text" class="edit-input"></td>
-            <td><input type="text" class="edit-input"></td>
-        `;
-        tableBody?.prepend(tr);
-        selectedRow = tr;
-        selectedRow.classList.add('selected-row');
-        updateButtonStates();
-    }
-
-    function handleEdit() {
-        if (!selectedRow) return;
-        isEditing = true;
-        
-        const d = selectedRow.dataset;
-        const cells = selectedRow.cells;
-        
-        cells[0].innerHTML = `<input type="text" class="edit-input" value="${d.symbol}">`;
-        cells[1].innerHTML = `<input type="text" class="edit-input" value="${d.name}">`;
-        
-        cells[2].innerHTML = `<select class="edit-input">${typeOptions}</select>`;
-        (cells[2].querySelector('select') as HTMLSelectElement).value = d.type;
-        
-        cells[3].innerHTML = `<select class="edit-input">${assetClassOptions}</select>`;
-        (cells[3].querySelector('select') as HTMLSelectElement).value = d.assetClass;
-        
-        cells[4].innerHTML = `<input type="text" class="edit-input" value="${d.prevClose}">`;
-        cells[5].innerHTML = `<input type="text" class="edit-input" value="${d.open}">`;
-        cells[6].innerHTML = `<input type="text" class="edit-input" value="${d.price}">`;
-        cells[7].innerHTML = `<input type="text" class="edit-input" value="${d.nav}">`;
-        cells[8].innerHTML = `<input type="text" class="edit-input" value="${d.range}">`;
-        cells[9].innerHTML = `<input type="text" class="edit-input" value="${d.volume}">`;
-        cells[10].innerHTML = `<input type="text" class="edit-input" value="${d.yield30}">`;
-        cells[11].innerHTML = `<input type="text" class="edit-input" value="${d.yield7}">`;
-
-        updateButtonStates();
-    }
-
-    function cancelEdit() {
-        if (isNew) {
-            document.getElementById('temp-row')?.remove();
-            isNew = false;
-        } else if (isEditing && selectedRow) {
-            const d = selectedRow.dataset;
-            selectedRow.cells[0].textContent = d.symbol;
-            selectedRow.cells[1].textContent = d.name;
-            selectedRow.cells[2].textContent = d.type;
-            selectedRow.cells[3].textContent = d.assetClass;
-            selectedRow.cells[4].textContent = d.prevClose;
-            selectedRow.cells[5].textContent = d.open;
-            selectedRow.cells[6].textContent = d.price;
-            selectedRow.cells[7].textContent = d.nav;
-            selectedRow.cells[8].textContent = d.range;
-            selectedRow.cells[9].textContent = d.volume;
-            selectedRow.cells[10].textContent = d.yield30;
-            selectedRow.cells[11].textContent = d.yield7;
-            isEditing = false;
-        }
-        
-        const firstRow = document.querySelector('#securities-table tbody tr:not(#temp-row)') as SecurityRow;
-        if (firstRow) {
-            selectedRow = null;
-            selectRow(firstRow);
-        }
-        updateButtonStates();
-    }
-
-    function handleSave() {
-        if (!selectedRow) return;
-        
-        const inputs = selectedRow.querySelectorAll('input, select');
-        const data = {
-            symbol: (inputs[0] as HTMLInputElement).value,
-            name: (inputs[1] as HTMLInputElement).value,
-            type: (inputs[2] as HTMLSelectElement).value,
-            assetClass: (inputs[3] as HTMLSelectElement).value,
-            prevClose: (inputs[4] as HTMLInputElement).value,
-            open: (inputs[5] as HTMLInputElement).value,
-            price: (inputs[6] as HTMLInputElement).value,
-            nav: (inputs[7] as HTMLInputElement).value,
-            range: (inputs[8] as HTMLInputElement).value,
-            volume: (inputs[9] as HTMLInputElement).value,
-            yield30: (inputs[10] as HTMLInputElement).value,
-            yield7: (inputs[11] as HTMLInputElement).value,
-        };
-
-        if (isNew) {
-            actionForm.action = '/admin/securities/create';
-        } else {
-            actionForm.action = `/admin/securities/update/${selectedRow.dataset.id}`;
-        }
-
-        (document.getElementById('form-symbol') as HTMLInputElement).value = data.symbol;
-        (document.getElementById('form-name') as HTMLInputElement).value = data.name;
-        (document.getElementById('form-type') as HTMLInputElement).value = data.type;
-        (document.getElementById('form-asset-class') as HTMLInputElement).value = data.assetClass;
-        (document.getElementById('form-prev-close') as HTMLInputElement).value = data.prevClose;
-        (document.getElementById('form-open') as HTMLInputElement).value = data.open;
-        (document.getElementById('form-price') as HTMLInputElement).value = data.price;
-        (document.getElementById('form-nav') as HTMLInputElement).value = data.nav;
-        (document.getElementById('form-range') as HTMLInputElement).value = data.range;
-        (document.getElementById('form-volume') as HTMLInputElement).value = data.volume;
-        (document.getElementById('form-yield30') as HTMLInputElement).value = data.yield30;
-        (document.getElementById('form-yield7') as HTMLInputElement).value = data.yield7;
-
-        actionForm.submit();
-    }
-
-    function handleDelete() {
-        if (!selectedRow || isEditing || isNew) return;
-        if (confirm(`Delete security ${selectedRow.dataset.symbol}?`)) {
-            actionForm.action = `/admin/securities/delete/${selectedRow.dataset.id}`;
-            actionForm.submit();
-        }
-    }
-
-    tableBody?.addEventListener('click', (e) => {
-        const tr = (e.target as HTMLElement).closest('tr') as SecurityRow;
-        if (tr && tableBody.contains(tr) && tr.id !== 'temp-row') {
-            selectRow(tr);
-        }
-    });
-
-    btnNew.addEventListener('click', handleNew);
-    btnEdit.addEventListener('click', handleEdit);
-    btnSave.addEventListener('click', handleSave);
-    btnCancel.addEventListener('click', cancelEdit);
-    btnDelete.addEventListener('click', handleDelete);
-
-    const first = document.querySelector('#securities-table tbody tr') as SecurityRow;
-    if (first) selectRow(first);
 });

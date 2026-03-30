@@ -121,5 +121,5 @@
          data-users='{ {% for u in all_users %}"{{ u.id }}": {"id": {{ u.id }}, "username": "{{ u.username }}", "email": "{{ u.email }}"}{% if not loop.last %},{% endif %}{% endfor %} }'>
     </div>
 
-    <script src="/static/js/admin_roles.js"></script>
+    <script src="/static/js/admin_roles.js" type="module"></script>
 {% endblock %}

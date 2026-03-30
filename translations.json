@@ -19,6 +19,7 @@
         "heading_system_settings": "System Settings",
         "label_log_lines": "Lines to show for log:",
         "btn_save": "Save Settings",
+        "btn_search": "Search",
         "btn_cancel": "Cancel",
         "nav_login": "Login",
         "nav_register": "Register",
@@ -120,6 +121,7 @@
         "label_avg_volume": "Avg. Volume",
         "label_30_day_yield": "30 Day Yield",
         "label_7_day_yield": "7 Day Yield",
+        "heading_lookup_results": "Search Results",
         "heading_unauthorized": "Access Denied",
         "msg_unauthorized_body": "You do not have permission to access this page.",
         "msg_contact_admin": "Please contact a system administrator if you believe this is an error."
@@ -144,6 +146,7 @@
         "heading_system_settings": "Configuración del Sistema",
         "label_log_lines": "Líneas de registro a mostrar:",
         "btn_save": "Guardar Cambios",
+        "btn_search": "Buscar",
         "btn_cancel": "Cancelar",
         "nav_login": "Iniciar Sesión",
         "nav_register": "Registrarse",
@@ -245,6 +248,7 @@
         "label_avg_volume": "Volumen Promedio",
         "label_30_day_yield": "Rendimiento de 30 Días",
         "label_7_day_yield": "Rendimiento de 7 Días",
+        "heading_lookup_results": "Resultados de Búsqueda",
         "heading_unauthorized": "Acceso Denegado",
         "msg_unauthorized_body": "No tiene permiso para acceder a esta página.",
         "msg_contact_admin": "Por favor, póngase en contacto con un administrador del sistema si cree que esto es un error."

@@ -1,4 +1,3 @@
-"use strict";
 document.addEventListener('DOMContentLoaded', () => {
     let selectedPageRow = null;
     let selectedSubjectRow = null;
@@ -75,3 +74,4 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+export {};

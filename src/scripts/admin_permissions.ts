@@ -1,3 +1,5 @@
+export {};
+
 document.addEventListener('DOMContentLoaded', () => {
     let selectedPageRow: HTMLElement | null = null;
     let selectedSubjectRow: HTMLElement | null = null;

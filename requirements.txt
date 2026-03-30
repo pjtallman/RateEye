@@ -10,4 +10,6 @@ python-multipart
 itsdangerous
 pytest
 pytest-asyncio
-httpx
+beautifulsoup4
+yfinance
+curl_cffi
