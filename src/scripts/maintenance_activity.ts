@@ -13,6 +13,7 @@ export interface ActivityMetadata {
             type?: string;
             options_source?: string;
             has_lookup?: boolean;
+            suffix?: string;
         }>;
     };
 }
@@ -113,7 +114,18 @@ export class MaintenanceActivityManager {
             const val = row.getAttribute(`data-${f.name.replace(/_/g, '-')}`) || '';
             const input = document.getElementById(`field-${f.name}`) as HTMLInputElement | HTMLSelectElement;
             if (input) {
-                input.value = val;
+                // (3) Internal percentage formatting
+                if (f.suffix === '%' && val) {
+                    const num = parseFloat(val);
+                    if (!isNaN(num)) {
+                        // Convert decimal (0.05) to percentage (5.00%)
+                        input.value = (num * 100).toFixed(2) + '%';
+                    } else {
+                        input.value = val;
+                    }
+                } else {
+                    input.value = val;
+                }
                 this.originalData[f.name] = val;
             }
         });
@@ -124,6 +136,12 @@ export class MaintenanceActivityManager {
         inputs.forEach(i => (i as HTMLInputElement).disabled = true);
         const lookupButtons = this.maintenanceForm.querySelectorAll('.btn-lookup');
         lookupButtons.forEach(btn => (btn as HTMLElement).style.display = 'none');
+        
+        // (1) Show refresh buttons in read mode if a row is selected
+        const refreshButtons = this.maintenanceForm.querySelectorAll('.btn-refresh-field');
+        refreshButtons.forEach(btn => {
+            (btn as HTMLElement).style.display = this.selectedRow ? 'inline-block' : 'none';
+        });
     }
 
     protected enableForm() {
@@ -135,6 +153,10 @@ export class MaintenanceActivityManager {
         });
         const lookupButtons = this.maintenanceForm.querySelectorAll('.btn-lookup');
         lookupButtons.forEach(btn => (btn as HTMLElement).style.display = 'inline-block');
+        
+        // (1) Hide refresh buttons in edit/new mode
+        const refreshButtons = this.maintenanceForm.querySelectorAll('.btn-refresh-field');
+        refreshButtons.forEach(btn => (btn as HTMLElement).style.display = 'none');
     }
 
     protected updateButtonStates() {
@@ -155,7 +177,23 @@ export class MaintenanceActivityManager {
 
         return this.metadata.maintenance_panel.fields.some(f => {
             const input = document.getElementById(`field-${f.name}`) as HTMLInputElement | HTMLSelectElement;
-            return input && input.value !== (this.originalData[f.name] || '');
+            if (!input) return false;
+            
+            let currentVal = input.value;
+            // (3) Strip % and convert back to decimal for comparison
+            if (f.suffix === '%' && currentVal.endsWith('%')) {
+                const num = parseFloat(currentVal.replace('%', ''));
+                if (!isNaN(num)) {
+                    currentVal = (num / 100).toString();
+                }
+            }
+            
+            // Normalize for comparison
+            const orig = this.originalData[f.name] || '';
+            if (f.suffix === '%') {
+                return parseFloat(currentVal).toFixed(6) !== parseFloat(orig).toFixed(6);
+            }
+            return currentVal !== orig;
         });
     }
 
@@ -215,7 +253,17 @@ export class MaintenanceActivityManager {
         this.metadata.maintenance_panel.fields.forEach(f => {
             const input = document.getElementById(`field-${f.name}`) as HTMLInputElement | HTMLSelectElement;
             const hidden = document.getElementById(`form-${f.name.replace(/_/g, '-')}`) as HTMLInputElement;
-            if (input && hidden) hidden.value = input.value;
+            if (input && hidden) {
+                let val = input.value;
+                // (3) Strip % and convert to decimal for submission
+                if (f.suffix === '%' && val.endsWith('%')) {
+                    const num = parseFloat(val.replace('%', ''));
+                    if (!isNaN(num)) {
+                        val = (num / 100).toString();
+                    }
+                }
+                hidden.value = val;
+            }
         });
 
         this.actionForm.submit();

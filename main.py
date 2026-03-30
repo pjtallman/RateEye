@@ -28,7 +28,7 @@ from authlib.integrations.starlette_client import OAuth
 # Local Imports
 from i18n import get_text
 from database import User, UserSetting, SystemSetting, Role, user_roles, engine, SessionLocal, get_db, init_db, get_system_setting, PageType, Permission, PermissionLevel, get_pages, Security, SecurityType, AssetClass
-from src.rateeye.securities.scraper import YahooFinanceScraper
+from src.rateeye.securities.endpoints import YahooScraperEndpoint, FinnhubEndpoint, AlphaVantageEndpoint
 
 # --- 1. LOGGING & ENVIRONMENT SETUP ---
 LOG_DIR = "logs"
@@ -75,6 +75,19 @@ def load_metadata(activity_name: str, model_class=None) -> dict:
             }
         }
     return {}
+
+def get_security_endpoint(db: Session):
+    """Factory to get the active security data endpoint based on system settings."""
+    endpoint_type = get_system_setting(db, "security_data_endpoint", "yahoo")
+    api_key = get_system_setting(db, "security_data_api_key", "")
+    
+    if endpoint_type == "finnhub":
+        return FinnhubEndpoint(api_key=api_key)
+    elif endpoint_type == "alphavantage":
+        return AlphaVantageEndpoint(api_key=api_key)
+    else:
+        return YahooScraperEndpoint()
+
 if not IS_TESTING:
     logging.basicConfig(
         level=logging.INFO,
@@ -435,26 +448,45 @@ async def system_settings_page(
     # Future: check for admin permissions here
     t = get_text(accept_language)
     line_count = get_system_setting(db, "log_lines", "100")
+    active_endpoint = get_system_setting(db, "security_data_endpoint", "yahoo")
+    active_key = get_system_setting(db, "security_data_api_key", "")
+    
     logger.info(f"System settings page accessed by {user.email}.")
     return templates.TemplateResponse(
-        request, "system_settings.html", {"t": t, "line_count": line_count, "user": user}
+        request, "system_settings.html", {
+            "t": t, 
+            "line_count": line_count, 
+            "user": user,
+            "active_endpoint": active_endpoint,
+            "active_key": active_key
+        }
     )
 
 
 @app.post("/settings/system", tags=[PageType.SETTINGS])
 async def save_system_settings(
     log_lines: str = Form(...), 
+    security_data_endpoint: str = Form("yahoo"),
+    api_key: str = Form(""),
     user: User = Depends(login_required),
     db: Session = Depends(get_db)
 ):
     # Future: check for admin permissions here
-    setting = db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first()
-    if setting:
-        setting.value = log_lines
-    else:
-        db.add(SystemSetting(name="log_lines", value=log_lines))
+    settings_to_save = {
+        "log_lines": log_lines,
+        "security_data_endpoint": security_data_endpoint,
+        "security_data_api_key": api_key
+    }
+    
+    for name, value in settings_to_save.items():
+        setting = db.query(SystemSetting).filter(SystemSetting.name == name).first()
+        if setting:
+            setting.value = value
+        else:
+            db.add(SystemSetting(name=name, value=value))
+            
     db.commit()
-    logger.info(f"System settings saved by {user.email}. New log_lines limit: {log_lines}")
+    logger.info(f"System settings saved by {user.email}.")
     return RedirectResponse(url="/settings/system", status_code=303)
 
 
@@ -883,23 +915,50 @@ async def delete_security(
 @app.get("/admin/securities/search", tags=[PageType.MAINTENANCE])
 async def search_securities(
     q: str,
-    user: User = Depends(check_page_permission)
+    user: User = Depends(check_page_permission),
+    db: Session = Depends(get_db)
 ):
-    scraper = YahooFinanceScraper()
-    results = await scraper.search(q)
+    endpoint = get_security_endpoint(db)
+    results = await endpoint.search(q)
     return results
 
 
 @app.get("/admin/securities/lookup", tags=[PageType.MAINTENANCE])
 async def lookup_security(
     symbol: str,
-    user: User = Depends(check_page_permission)
+    user: User = Depends(check_page_permission),
+    db: Session = Depends(get_db)
 ):
-    scraper = YahooFinanceScraper()
-    data = await scraper.lookup(symbol)
+    endpoint = get_security_endpoint(db)
+    data = await endpoint.lookup(symbol)
     if not data:
         raise HTTPException(status_code=404, detail="Security not found")
     return data
+
+@app.post("/admin/securities/test_endpoint", tags=[PageType.SETTINGS])
+async def test_security_endpoint(
+    endpoint: str = Form(...),
+    api_key: Optional[str] = Form(None),
+    user: User = Depends(check_page_permission),
+    db: Session = Depends(get_db)
+):
+    try:
+        if endpoint == "finnhub":
+            ep = FinnhubEndpoint(api_key=api_key or "")
+        elif endpoint == "alphavantage":
+            ep = AlphaVantageEndpoint(api_key=api_key or "")
+        else:
+            ep = YahooScraperEndpoint()
+        
+        # Test with VOO
+        data = await ep.lookup("VOO")
+        if data and data.get("symbol") == "VOO":
+            return {"success": True}
+        else:
+            return {"success": False, "error": "No data returned for VOO"}
+    except Exception as e:
+        logger.error(f"Endpoint test failed: {e}")
+        return {"success": False, "error": str(e)}
 
 
 @app.get("/admin/permissions", response_class=HTMLResponse, tags=[PageType.MAINTENANCE])

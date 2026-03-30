@@ -17,9 +17,9 @@ class SecuritiesManager extends MaintenanceActivityManager {
         this.lookupSearchInput = document.getElementById('lookup-search-input');
         this.btnLookupSearch = document.getElementById('btn-lookup-search');
         this.btnCloseLookup = document.getElementById('btn-close-lookup');
-        this.initLookupListeners();
+        this.initSecuritiesListeners();
     }
-    initLookupListeners() {
+    initSecuritiesListeners() {
         var _a, _b, _c;
         const lookupButtons = document.querySelectorAll('.btn-lookup');
         lookupButtons.forEach(btn => {
@@ -32,10 +32,52 @@ class SecuritiesManager extends MaintenanceActivityManager {
         (_b = this.btnCloseLookup) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => {
             this.lookupModal.style.display = 'none';
         });
+        // (2) Refresh button listener
+        const refreshButtons = document.querySelectorAll('.btn-refresh-field');
+        refreshButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.refreshPrice();
+            });
+        });
         // Allow Enter key in lookup search
         (_c = this.lookupSearchInput) === null || _c === void 0 ? void 0 : _c.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.handleLookup();
+            }
+        });
+    }
+    // (2) Auto-fetch price when row selected
+    selectRow(row) {
+        super.selectRow(row);
+        if (this.selectedRow) {
+            this.refreshPrice(true); // silent=true for auto-fetch
+        }
+    }
+    refreshPrice() {
+        return __awaiter(this, arguments, void 0, function* (silent = false) {
+            const symbolInput = document.getElementById('field-symbol');
+            const symbol = symbolInput === null || symbolInput === void 0 ? void 0 : symbolInput.value;
+            if (!symbol)
+                return;
+            try {
+                if (!silent)
+                    this.showMessage(`Refreshing price for ${symbol}...`);
+                const resp = yield fetch(`/admin/securities/lookup?symbol=${encodeURIComponent(symbol)}`);
+                if (resp.ok) {
+                    const data = yield resp.json();
+                    const priceInput = document.getElementById('field-current_price');
+                    if (priceInput && data.current_price) {
+                        priceInput.value = data.current_price;
+                        if (!silent)
+                            this.showMessage(`Updated price for ${symbol}: ${data.current_price}`);
+                        this.checkDirty();
+                    }
+                }
+            }
+            catch (err) {
+                if (!silent)
+                    this.showMessage(`Failed to refresh price for ${symbol}`, true);
             }
         });
     }
@@ -67,9 +109,9 @@ class SecuritiesManager extends MaintenanceActivityManager {
             try {
                 this.lookupResultsList.innerHTML = '<tr><td colspan="2" style="padding: 15px;">Searching...</td></tr>';
                 this.lookupResultsCount.textContent = '';
-                // Requirement (1): Exact match first
+                // Exact match first
                 let results = yield this.performSearch(query);
-                // Requirement (1): If no records, then starts with search
+                // If no records, then starts with search
                 if (results.length === 0 && !query.endsWith('*')) {
                     results = yield this.performSearch(query + '*');
                 }
@@ -99,7 +141,6 @@ class SecuritiesManager extends MaintenanceActivityManager {
     }
     showLookupResults(results) {
         this.lookupResultsList.innerHTML = '';
-        // Display count of matching records
         if (this.lookupResultsCount) {
             this.lookupResultsCount.textContent = `Found ${results.length} record(s)`;
         }
@@ -160,7 +201,19 @@ class SecuritiesManager extends MaintenanceActivityManager {
         Object.keys(mapping).forEach(key => {
             const input = document.getElementById(`field-${key}`);
             if (input && mapping[key] !== undefined) {
-                input.value = mapping[key] || '';
+                // (3) Special handling for yields to format as percentages
+                if (key.startsWith('yield_') && mapping[key]) {
+                    const num = parseFloat(mapping[key]);
+                    if (!isNaN(num)) {
+                        input.value = (num * 100).toFixed(2) + '%';
+                    }
+                    else {
+                        input.value = mapping[key];
+                    }
+                }
+                else {
+                    input.value = mapping[key] || '';
+                }
             }
         });
         this.checkDirty();

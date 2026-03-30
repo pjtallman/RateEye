@@ -10,10 +10,10 @@ class SecuritiesManager extends MaintenanceActivityManager {
 
     constructor(metadata: ActivityMetadata) {
         super(metadata);
-        this.initLookupListeners();
+        this.initSecuritiesListeners();
     }
 
-    private initLookupListeners() {
+    private initSecuritiesListeners() {
         const lookupButtons = document.querySelectorAll('.btn-lookup');
         lookupButtons.forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -28,12 +28,51 @@ class SecuritiesManager extends MaintenanceActivityManager {
             this.lookupModal.style.display = 'none';
         });
 
+        // (2) Refresh button listener
+        const refreshButtons = document.querySelectorAll('.btn-refresh-field');
+        refreshButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.refreshPrice();
+            });
+        });
+
         // Allow Enter key in lookup search
         this.lookupSearchInput?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.handleLookup();
             }
         });
+    }
+
+    // (2) Auto-fetch price when row selected
+    protected override selectRow(row: HTMLElement) {
+        super.selectRow(row);
+        if (this.selectedRow) {
+            this.refreshPrice(true); // silent=true for auto-fetch
+        }
+    }
+
+    private async refreshPrice(silent: boolean = false) {
+        const symbolInput = document.getElementById('field-symbol') as HTMLInputElement;
+        const symbol = symbolInput?.value;
+        if (!symbol) return;
+
+        try {
+            if (!silent) this.showMessage(`Refreshing price for ${symbol}...`);
+            const resp = await fetch(`/admin/securities/lookup?symbol=${encodeURIComponent(symbol)}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                const priceInput = document.getElementById('field-current_price') as HTMLInputElement;
+                if (priceInput && data.current_price) {
+                    priceInput.value = data.current_price;
+                    if (!silent) this.showMessage(`Updated price for ${symbol}: ${data.current_price}`);
+                    this.checkDirty();
+                }
+            }
+        } catch (err) {
+            if (!silent) this.showMessage(`Failed to refresh price for ${symbol}`, true);
+        }
     }
 
     private openLookupDialog() {
@@ -64,10 +103,10 @@ class SecuritiesManager extends MaintenanceActivityManager {
             this.lookupResultsList.innerHTML = '<tr><td colspan="2" style="padding: 15px;">Searching...</td></tr>';
             this.lookupResultsCount.textContent = '';
 
-            // Requirement (1): Exact match first
+            // Exact match first
             let results = await this.performSearch(query);
 
-            // Requirement (1): If no records, then starts with search
+            // If no records, then starts with search
             if (results.length === 0 && !query.endsWith('*')) {
                 results = await this.performSearch(query + '*');
             }
@@ -96,7 +135,6 @@ class SecuritiesManager extends MaintenanceActivityManager {
     private showLookupResults(results: any[]) {
         this.lookupResultsList.innerHTML = '';
         
-        // Display count of matching records
         if (this.lookupResultsCount) {
             this.lookupResultsCount.textContent = `Found ${results.length} record(s)`;
         }
@@ -157,7 +195,17 @@ class SecuritiesManager extends MaintenanceActivityManager {
         Object.keys(mapping).forEach(key => {
             const input = document.getElementById(`field-${key}`) as HTMLInputElement | HTMLSelectElement;
             if (input && mapping[key] !== undefined) {
-                input.value = mapping[key] || '';
+                // (3) Special handling for yields to format as percentages
+                if (key.startsWith('yield_') && mapping[key]) {
+                    const num = parseFloat(mapping[key]);
+                    if (!isNaN(num)) {
+                        input.value = (num * 100).toFixed(2) + '%';
+                    } else {
+                        input.value = mapping[key];
+                    }
+                } else {
+                    input.value = mapping[key] || '';
+                }
             }
         });
         

@@ -99,12 +99,17 @@
                                     {% endif %}
                                 </select>
                             {% else %}
-                                <div class="{% if field.has_lookup %}symbol-lookup-container{% endif %}">
+                                <div class="{% if field.has_lookup or field.has_refresh %}symbol-lookup-container{% endif %}">
                                     <input type="text" id="field-{{ field.name }}" name="{{ field.name }}" class="edit-input" 
                                            {% if field.read_only %}readonly{% endif %}
                                            {% if field.required %}required{% endif %}>
                                     {% if field.has_lookup %}
                                     <button type="button" class="btn-lookup" style="display: none;">Lookup</button>
+                                    {% endif %}
+                                    {% if field.has_refresh %}
+                                    <button type="button" class="btn-refresh-field" data-field="{{ field.name }}" style="display: none;" title="Refresh Current Price">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                    </button>
                                     {% endif %}
                                 </div>
                             {% endif %}

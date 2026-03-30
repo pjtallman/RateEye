@@ -4,11 +4,11 @@
     {% for s in securities %}
     <tr data-id="{{ s.id }}" 
         {% for field in metadata.maintenance_panel.fields %}
-        data-{{ field.name | replace('_', '-') }}="{{ s[field.name].value if s[field.name] is mapping else (s[field.name] or '') }}"
+        data-{{ field.name | replace('_', '-') }}="{{ s[field.name].value if s[field.name].value is defined else (s[field.name] or '') }}"
         {% endfor %}
     >
         {% for col in metadata.browse_panel.columns %}
-        <td>{{ s[col.name].value if s[col.name] is mapping else (s[col.name] or '') }}</td>
+        <td>{{ s[col.name].value if s[col.name].value is defined else (s[col.name] or '') }}</td>
         {% endfor %}
     </tr>
     {% endfor %}
