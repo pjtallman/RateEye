@@ -39,11 +39,29 @@ class BaseSecurityEndpoint(ABC):
 
     def _infer_asset_class(self, info: Dict) -> Optional[str]:
         y_type = info.get("quoteType")
-        # For MMFs or anything Yahoo calls MONEYMARKET, asset class is Money Market
         if y_type == "MONEYMARKET":
             return AssetClass.MONEY_MARKET.value
+        
+        category = info.get("category", "")
+        long_name = info.get("longName", "") or info.get("shortName", "")
+        summary = info.get("longBusinessSummary", "")
+        
+        text_to_check = f"{category} {long_name} {summary}".lower()
+        
+        if "small" in text_to_check:
+            return AssetClass.SMALL_CAP_STOCK.value
+        if "mid" in text_to_check:
+            # We don't have MID_CAP in AssetClass enum, default to LARGE or SMALL?
+            # Existing enum has LARGE_CAP and SMALL_CAP.
+            return AssetClass.LARGE_CAP_STOCK.value
+        if "large" in text_to_check or "total market" in text_to_check or "s&p 500" in text_to_check:
+            return AssetClass.LARGE_CAP_STOCK.value
+        if "bond" in text_to_check:
+            return AssetClass.DOMESTIC_BOND.value
+            
         if y_type == "EQUITY":
             return AssetClass.LARGE_CAP_STOCK.value
+            
         return None
 
 class YahooScraperEndpoint(BaseSecurityEndpoint):

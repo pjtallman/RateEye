@@ -19,25 +19,23 @@ class SecuritiesManager extends MaintenanceActivityManager {
     }
     initSecuritiesListeners() {
         var _a, _b;
-        // (5) Single-select lookup for the Symbol field
         const lookupButtons = document.querySelectorAll('.btn-lookup');
         lookupButtons.forEach(btn => {
             btn.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
                 e.stopPropagation();
                 const symbolInput = document.getElementById('field-symbol');
-                const results = yield this.lookupDialog.open("Symbol Lookup", false, symbolInput.value);
+                const results = yield this.lookupDialog.open({
+                    title: "Symbol Lookup",
+                    multiSelect: false,
+                    initialValue: symbolInput.value
+                });
                 if (results && results.length > 0) {
                     this.fetchMetadata(results[0].symbol);
                 }
             }));
         });
-        // (6) Bulk Add
         (_a = this.btnBulkAdd) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => this.handleBulkAdd());
-        // Bulk Delete placeholder
-        (_b = this.btnBulkDelete) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => {
-            this.showMessage("Bulk Delete not yet implemented", true);
-        });
-        // Refresh button listener
+        (_b = this.btnBulkDelete) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => this.handleBulkDelete());
         const refreshButtons = document.querySelectorAll('.btn-refresh-field');
         refreshButtons.forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -46,11 +44,10 @@ class SecuritiesManager extends MaintenanceActivityManager {
             });
         });
     }
-    // Auto-fetch price when row selected
     selectRow(row) {
         super.selectRow(row);
         if (this.selectedRow) {
-            this.refreshPrice(true); // silent=true for auto-fetch
+            this.refreshPrice(true);
         }
     }
     refreshPrice() {
@@ -82,8 +79,10 @@ class SecuritiesManager extends MaintenanceActivityManager {
     }
     handleBulkAdd() {
         return __awaiter(this, void 0, void 0, function* () {
-            // (6) Implement Bulk Add
-            const results = yield this.lookupDialog.open("Bulk Add", true);
+            const results = yield this.lookupDialog.open({
+                title: "Bulk Add",
+                multiSelect: true
+            });
             if (results && results.length > 0) {
                 this.showMessage(`Adding ${results.length} securities...`);
                 const symbols = results.map(r => r.symbol);
@@ -94,12 +93,7 @@ class SecuritiesManager extends MaintenanceActivityManager {
                         body: JSON.stringify({ symbols })
                     });
                     if (resp.ok) {
-                        // (5) Upon exit, select the first symbol
-                        const firstSymbol = symbols[0];
-                        // We need to reload to get them into the BT, but we want to select one after reload.
-                        // For now, reload and we'll handle the selection via a URL param or similar in a real app.
-                        // Simple approach: reload.
-                        window.location.href = `/admin/securities?select=${firstSymbol}`;
+                        window.location.href = `/admin/securities?select=${symbols[0]}`;
                     }
                     else {
                         const data = yield resp.json();
@@ -108,6 +102,53 @@ class SecuritiesManager extends MaintenanceActivityManager {
                 }
                 catch (err) {
                     this.showMessage(err.message || "An error occurred during bulk add", true);
+                }
+            }
+        });
+    }
+    handleBulkDelete() {
+        return __awaiter(this, void 0, void 0, function* () {
+            // (3) Implement Bulk Delete
+            const allSecurities = [];
+            const rows = document.querySelectorAll('#browse-table tbody tr');
+            rows.forEach(row => {
+                var _a, _b;
+                const cells = row.cells;
+                if (cells.length >= 2) {
+                    allSecurities.push({
+                        symbol: ((_a = cells[0].textContent) === null || _a === void 0 ? void 0 : _a.trim()) || '',
+                        name: ((_b = cells[1].textContent) === null || _b === void 0 ? void 0 : _b.trim()) || ''
+                    });
+                }
+            });
+            const results = yield this.lookupDialog.open({
+                title: "Bulk Delete",
+                multiSelect: true,
+                defaultChecked: false,
+                statusTemplate: "{N} records selected to be deleted",
+                preloadedResults: allSecurities
+            });
+            if (results && results.length > 0) {
+                if (!confirm(`Are you sure you want to delete ${results.length} securities?`))
+                    return;
+                this.showMessage(`Deleting ${results.length} securities...`);
+                const symbols = results.map(r => r.symbol);
+                try {
+                    const resp = yield fetch('/admin/securities/bulk_delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ symbols })
+                    });
+                    if (resp.ok) {
+                        window.location.reload();
+                    }
+                    else {
+                        const data = yield resp.json();
+                        this.showMessage(data.detail || "Bulk delete failed", true);
+                    }
+                }
+                catch (err) {
+                    this.showMessage(err.message || "An error occurred during bulk delete", true);
                 }
             }
         });
@@ -150,7 +191,6 @@ class SecuritiesManager extends MaintenanceActivityManager {
         Object.keys(mapping).forEach(key => {
             const input = document.getElementById(`field-${key}`);
             if (input && mapping[key] !== undefined) {
-                // Special handling for yields to format as percentages
                 if (key.startsWith('yield_') && mapping[key]) {
                     const num = parseFloat(mapping[key]);
                     if (!isNaN(num)) {
@@ -177,7 +217,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (metadataElement) {
         const metadata = JSON.parse(metadataElement.textContent || '{}');
         const manager = new SecuritiesManager(metadata);
-        // Handle auto-selection from URL param
         const urlParams = new URLSearchParams(window.location.search);
         const selectSymbol = urlParams.get('select');
         if (selectSymbol) {

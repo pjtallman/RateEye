@@ -995,6 +995,24 @@ async def bulk_create_securities(
         
     return {"added": added, "errors": errors}
 
+class BulkDeleteRequest(BaseModel):
+    symbols: List[str]
+
+@app.post("/admin/securities/bulk_delete", tags=[PageType.MAINTENANCE])
+async def bulk_delete_securities(
+    request: BulkDeleteRequest,
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    symbols = [s.upper().strip() for s in request.symbols]
+    if not symbols:
+        return {"deleted": 0}
+        
+    deleted_count = db.query(Security).filter(Security.symbol.in_(symbols)).delete(synchronize_session=False)
+    db.commit()
+    logger.info(f"Bulk delete performed by {user.email}. {deleted_count} securities removed.")
+    return {"deleted": deleted_count}
+
 @app.post("/admin/securities/test_endpoint", tags=[PageType.SETTINGS])
 async def test_security_endpoint(
     endpoint: str = Form(...),

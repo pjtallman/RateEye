@@ -34,3 +34,23 @@ def test_bulk_create_duplicates(client, test_admin, db):
     data = resp.json()
     assert "VOO already exists" in data["errors"][0]
     assert "GOOG" in data["added"]
+
+def test_bulk_delete_endpoint(client, test_admin, db):
+    from database import init_db, Security
+    init_db(db)
+    client.post("/login", data={"email": test_admin.email, "password": "adminpassword"}, follow_redirects=False)
+    
+    # Add some securities first
+    client.post("/admin/securities/bulk_create", json={"symbols": ["AAPL", "MSFT", "GOOG"]})
+    
+    # Verify count
+    assert db.query(Security).count() == 3
+    
+    # Bulk delete two
+    resp = client.post("/admin/securities/bulk_delete", json={"symbols": ["AAPL", "MSFT"]})
+    assert resp.status_code == 200
+    assert resp.json()["deleted"] == 2
+    
+    # Verify remaining
+    assert db.query(Security).count() == 1
+    assert db.query(Security).first().symbol == "GOOG"

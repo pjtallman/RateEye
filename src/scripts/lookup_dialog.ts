@@ -16,6 +16,8 @@ export class LookupDialog {
     private statusMessage: HTMLElement;
 
     private multiSelect: boolean = false;
+    private defaultChecked: boolean = true;
+    private statusTemplate: string | null = null;
     private selectedSymbols: Set<string> = new Set();
     private currentResults: LookupResult[] = [];
     private resolve: ((value: LookupResult[] | null) => void) | null = null;
@@ -32,6 +34,7 @@ export class LookupDialog {
         
         // Ensure status message area exists
         this.statusMessage = document.createElement('div');
+        this.statusMessage.className = 'lookup-status-message';
         this.statusMessage.style.padding = '0 20px 10px';
         this.statusMessage.style.fontSize = '0.85em';
         this.modal.querySelector('.modal-container')?.insertBefore(this.statusMessage, this.modal.querySelector('.modal-footer'));
@@ -48,10 +51,19 @@ export class LookupDialog {
         });
     }
 
-    public open(title: string, multiSelect: boolean = false, initialValue: string = ''): Promise<LookupResult[] | null> {
-        this.titleElement.textContent = title;
-        this.multiSelect = multiSelect;
-        this.searchInput.value = initialValue;
+    public open(options: {
+        title: string, 
+        multiSelect?: boolean, 
+        initialValue?: string,
+        defaultChecked?: boolean,
+        statusTemplate?: string,
+        preloadedResults?: LookupResult[]
+    }): Promise<LookupResult[] | null> {
+        this.titleElement.textContent = options.title;
+        this.multiSelect = options.multiSelect || false;
+        this.defaultChecked = options.defaultChecked !== undefined ? options.defaultChecked : true;
+        this.statusTemplate = options.statusTemplate || null;
+        this.searchInput.value = options.initialValue || '';
         this.selectedSymbols.clear();
         this.currentResults = [];
         this.resultsList.innerHTML = '';
@@ -59,6 +71,11 @@ export class LookupDialog {
         this.statusMessage.textContent = '';
         this.statusMessage.style.color = '#666';
         this.btnOk.disabled = true;
+
+        if (options.preloadedResults) {
+            this.currentResults = options.preloadedResults;
+            this.renderResults();
+        }
 
         this.modal.style.display = 'flex';
         this.searchInput.focus();
@@ -77,7 +94,6 @@ export class LookupDialog {
 
         let queries: string[] = [];
         if (this.multiSelect) {
-            // (5) Comma separated support and deduplication
             const seen = new Set<string>();
             queries = rawQuery.split(',').map(s => s.trim().toUpperCase()).filter(s => {
                 if (!s) return false;
@@ -101,8 +117,6 @@ export class LookupDialog {
             for (const q of queries) {
                 const results = await this.performFetch(q);
                 if (results.length > 0) {
-                    // In multi-select, if user typed exact symbols, we only want the exact matches if possible
-                    // or just take the first result for each.
                     if (this.multiSelect) {
                         const exact = results.find(r => r.symbol.toUpperCase() === q.toUpperCase());
                         allResults.push(exact || results[0]);
@@ -128,7 +142,6 @@ export class LookupDialog {
     }
 
     private async performFetch(q: string): Promise<LookupResult[]> {
-        // Try exact match first
         let resp = await fetch(`/admin/securities/search?q=${encodeURIComponent(q)}`);
         let data = await resp.json();
         
@@ -139,11 +152,17 @@ export class LookupDialog {
         return data;
     }
 
+    private updateStatus() {
+        if (this.statusTemplate) {
+            this.statusMessage.textContent = this.statusTemplate.replace('{N}', this.selectedSymbols.size.toString());
+            this.statusMessage.style.color = '#007bff';
+        }
+    }
+
     private renderResults() {
         this.resultsList.innerHTML = '';
         this.resultsCount.textContent = `Found ${this.currentResults.length} record(s)`;
         
-        // (5) Add Checkbox column header if multiSelect
         const thead = this.modal.querySelector('thead tr') as HTMLElement;
         if (!thead.querySelector('.cb-col')) {
             const th = document.createElement('th');
@@ -151,7 +170,25 @@ export class LookupDialog {
             th.style.width = '30px';
             thead.insertBefore(th, thead.firstChild);
         }
-        thead.querySelector('.cb-col')!.innerHTML = this.multiSelect ? '' : '';
+        
+        const headerCol = thead.querySelector('.cb-col') as HTMLElement;
+        if (this.multiSelect) {
+            headerCol.innerHTML = `<input type="checkbox" id="lookup-select-all" ${this.defaultChecked ? 'checked' : ''}>`;
+            const selectAll = headerCol.querySelector('#lookup-select-all') as HTMLInputElement;
+            selectAll.addEventListener('change', () => {
+                const cbs = this.resultsList.querySelectorAll('.row-check') as NodeListOf<HTMLInputElement>;
+                cbs.forEach(cb => {
+                    cb.checked = selectAll.checked;
+                    const symbol = cb.getAttribute('data-symbol')!;
+                    if (selectAll.checked) this.selectedSymbols.add(symbol);
+                    else this.selectedSymbols.delete(symbol);
+                });
+                this.btnOk.disabled = this.selectedSymbols.size === 0;
+                this.updateStatus();
+            });
+        } else {
+            headerCol.innerHTML = '';
+        }
 
         this.currentResults.forEach((res, index) => {
             const tr = document.createElement('tr');
@@ -159,10 +196,11 @@ export class LookupDialog {
             
             let html = '';
             if (this.multiSelect) {
-                html += `<td><input type="checkbox" class="row-check" data-index="${index}" checked></td>`;
-                this.selectedSymbols.add(res.symbol);
+                const isChecked = this.defaultChecked;
+                html += `<td><input type="checkbox" class="row-check" data-symbol="${res.symbol}" ${isChecked ? 'checked' : ''}></td>`;
+                if (isChecked) this.selectedSymbols.add(res.symbol);
             } else {
-                html += `<td></td>`; // Empty for single select spacing
+                html += `<td></td>`;
             }
             
             html += `<td><strong>${res.symbol}</strong></td><td>${res.name}</td>`;
@@ -181,6 +219,7 @@ export class LookupDialog {
                     this.selectedSymbols.add(res.symbol);
                 }
                 this.btnOk.disabled = this.selectedSymbols.size === 0;
+                this.updateStatus();
             });
 
             tr.addEventListener('dblclick', () => {
@@ -191,6 +230,7 @@ export class LookupDialog {
         });
 
         this.btnOk.disabled = this.selectedSymbols.size === 0;
+        this.updateStatus();
     }
 
     private handleOk() {

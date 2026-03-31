@@ -13,28 +13,25 @@ class SecuritiesManager extends MaintenanceActivityManager {
     }
 
     private initSecuritiesListeners() {
-        // (5) Single-select lookup for the Symbol field
         const lookupButtons = document.querySelectorAll('.btn-lookup');
         lookupButtons.forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 const symbolInput = document.getElementById('field-symbol') as HTMLInputElement;
-                const results = await this.lookupDialog.open("Symbol Lookup", false, symbolInput.value);
+                const results = await this.lookupDialog.open({
+                    title: "Symbol Lookup", 
+                    multiSelect: false, 
+                    initialValue: symbolInput.value
+                });
                 if (results && results.length > 0) {
                     this.fetchMetadata(results[0].symbol);
                 }
             });
         });
 
-        // (6) Bulk Add
         this.btnBulkAdd?.addEventListener('click', () => this.handleBulkAdd());
-        
-        // Bulk Delete placeholder
-        this.btnBulkDelete?.addEventListener('click', () => {
-            this.showMessage("Bulk Delete not yet implemented", true);
-        });
+        this.btnBulkDelete?.addEventListener('click', () => this.handleBulkDelete());
 
-        // Refresh button listener
         const refreshButtons = document.querySelectorAll('.btn-refresh-field');
         refreshButtons.forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -44,11 +41,10 @@ class SecuritiesManager extends MaintenanceActivityManager {
         });
     }
 
-    // Auto-fetch price when row selected
     protected override selectRow(row: HTMLElement) {
         super.selectRow(row);
         if (this.selectedRow) {
-            this.refreshPrice(true); // silent=true for auto-fetch
+            this.refreshPrice(true);
         }
     }
 
@@ -75,11 +71,12 @@ class SecuritiesManager extends MaintenanceActivityManager {
     }
 
     private async handleBulkAdd() {
-        // (6) Implement Bulk Add
-        const results = await this.lookupDialog.open("Bulk Add", true);
+        const results = await this.lookupDialog.open({
+            title: "Bulk Add", 
+            multiSelect: true
+        });
         if (results && results.length > 0) {
             this.showMessage(`Adding ${results.length} securities...`);
-            
             const symbols = results.map(r => r.symbol);
             try {
                 const resp = await fetch('/admin/securities/bulk_create', {
@@ -89,18 +86,59 @@ class SecuritiesManager extends MaintenanceActivityManager {
                 });
 
                 if (resp.ok) {
-                    // (5) Upon exit, select the first symbol
-                    const firstSymbol = symbols[0];
-                    // We need to reload to get them into the BT, but we want to select one after reload.
-                    // For now, reload and we'll handle the selection via a URL param or similar in a real app.
-                    // Simple approach: reload.
-                    window.location.href = `/admin/securities?select=${firstSymbol}`;
+                    window.location.href = `/admin/securities?select=${symbols[0]}`;
                 } else {
                     const data = await resp.json();
                     this.showMessage(data.detail || "Bulk add failed", true);
                 }
             } catch (err: any) {
                 this.showMessage(err.message || "An error occurred during bulk add", true);
+            }
+        }
+    }
+
+    private async handleBulkDelete() {
+        // (3) Implement Bulk Delete
+        const allSecurities: LookupResult[] = [];
+        const rows = document.querySelectorAll('#browse-table tbody tr');
+        rows.forEach(row => {
+            const cells = (row as HTMLTableRowElement).cells;
+            if (cells.length >= 2) {
+                allSecurities.push({
+                    symbol: cells[0].textContent?.trim() || '',
+                    name: cells[1].textContent?.trim() || ''
+                });
+            }
+        });
+
+        const results = await this.lookupDialog.open({
+            title: "Bulk Delete",
+            multiSelect: true,
+            defaultChecked: false,
+            statusTemplate: "{N} records selected to be deleted",
+            preloadedResults: allSecurities
+        });
+
+        if (results && results.length > 0) {
+            if (!confirm(`Are you sure you want to delete ${results.length} securities?`)) return;
+            
+            this.showMessage(`Deleting ${results.length} securities...`);
+            const symbols = results.map(r => r.symbol);
+            try {
+                const resp = await fetch('/admin/securities/bulk_delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbols })
+                });
+
+                if (resp.ok) {
+                    window.location.reload();
+                } else {
+                    const data = await resp.json();
+                    this.showMessage(data.detail || "Bulk delete failed", true);
+                }
+            } catch (err: any) {
+                this.showMessage(err.message || "An error occurred during bulk delete", true);
             }
         }
     }
@@ -142,7 +180,6 @@ class SecuritiesManager extends MaintenanceActivityManager {
         Object.keys(mapping).forEach(key => {
             const input = document.getElementById(`field-${key}`) as HTMLInputElement | HTMLSelectElement;
             if (input && mapping[key] !== undefined) {
-                // Special handling for yields to format as percentages
                 if (key.startsWith('yield_') && mapping[key]) {
                     const num = parseFloat(mapping[key]);
                     if (!isNaN(num)) {
@@ -170,7 +207,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const metadata = JSON.parse(metadataElement.textContent || '{}');
         const manager = new SecuritiesManager(metadata);
 
-        // Handle auto-selection from URL param
         const urlParams = new URLSearchParams(window.location.search);
         const selectSymbol = urlParams.get('select');
         if (selectSymbol) {
