@@ -3,7 +3,8 @@ import os
 import shutil
 import json
 from datetime import datetime
-from typing import Optional
+from pydantic import BaseModel
+from typing import Optional, List
 from enum import Enum
 
 # Check if we are running in a test environment
@@ -941,6 +942,58 @@ async def lookup_security(
     if not data:
         raise HTTPException(status_code=404, detail="Security not found")
     return data
+
+class BulkCreateRequest(BaseModel):
+    symbols: List[str]
+
+@app.post("/admin/securities/bulk_create", tags=[PageType.MAINTENANCE])
+async def bulk_create_securities(
+    request: BulkCreateRequest,
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    endpoint = get_security_endpoint(db)
+    added = []
+    errors = []
+    
+    for symbol in request.symbols:
+        symbol = symbol.upper().strip()
+        if not symbol: continue
+        existing = db.query(Security).filter(Security.symbol == symbol).first()
+        if existing:
+            errors.append(f"{symbol} already exists.")
+            continue
+            
+        try:
+            data = await endpoint.lookup(symbol)
+            if data:
+                new_sec = Security(
+                    symbol=symbol,
+                    name=data.get("name", symbol),
+                    security_type=data.get("security_type", SecurityType.STOCK),
+                    asset_class=data.get("asset_class"),
+                    current_price=data.get("current_price"),
+                    previous_close=data.get("previous_close"),
+                    open_price=data.get("open_price"),
+                    nav=data.get("nav"),
+                    range_52_week=data.get("range_52_week"),
+                    avg_volume=data.get("avg_volume"),
+                    yield_30_day=data.get("yield_30_day"),
+                    yield_7_day=data.get("yield_7_day")
+                )
+                db.add(new_sec)
+                added.append(symbol)
+            else:
+                errors.append(f"{symbol} not found.")
+        except Exception as e:
+            errors.append(f"Error adding {symbol}: {str(e)}")
+            
+    db.commit()
+    
+    if errors and not added:
+        raise HTTPException(status_code=400, detail="; ".join(errors))
+        
+    return {"added": added, "errors": errors}
 
 @app.post("/admin/securities/test_endpoint", tags=[PageType.SETTINGS])
 async def test_security_endpoint(

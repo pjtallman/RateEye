@@ -8,7 +8,40 @@
 <div class="activity-container">
     <!-- Title Panel (TP) -->
     <div class="title-panel">
-        <h2 id="activity-title">{{ title }}</h2>
+        <div class="label-panel">
+            <h2 id="activity-title">{{ title }}</h2>
+        </div>
+        <div class="button-bar-panel">
+            {% block action_buttons %}
+                {% if metadata and metadata.maintenance_panel %}
+                    {% if 'new' in metadata.maintenance_panel.buttons %}
+                    <button id="btn-new" class="btn-action btn-new">{{ t.btn_new or 'New' }}</button>
+                    {% endif %}
+                    {% if 'edit' in metadata.maintenance_panel.buttons %}
+                    <button id="btn-edit" class="btn-action btn-edit" disabled>{{ t.btn_edit or 'Edit' }}</button>
+                    {% endif %}
+                    {% if 'delete' in metadata.maintenance_panel.buttons %}
+                    <button id="btn-delete" class="btn-action btn-delete" disabled>{{ t.btn_delete or 'Delete' }}</button>
+                    {% endif %}
+                {% else %}
+                    <button id="btn-new" class="btn-action btn-new">New</button>
+                    <button id="btn-edit" class="btn-action btn-edit" disabled>Edit</button>
+                    <button id="btn-delete" class="btn-action btn-delete" disabled>Delete</button>
+                {% endif %}
+            {% endblock %}
+
+            <!-- Bulk Dropdown -->
+            <div class="dropdown-container">
+                <button id="btn-bulk" class="btn-action btn-bulk">
+                    Bulk
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-9"/></svg>
+                </button>
+                <div class="dropdown-content">
+                    <div id="btn-bulk-add">{{ t.item_bulk_add or 'Bulk Add' }}</div>
+                    <div id="btn-bulk-delete">{{ t.item_bulk_delete or 'Bulk Delete' }}</div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Activities Main Panel (AMP) -->
@@ -56,27 +89,6 @@
 
         <!-- Maintenance Panel (MP) -->
         <div class="maintenance-panel">
-            <!-- Action Panel (AP) -->
-            <div class="action-panel">
-                {% block action_buttons %}
-                    {% if metadata and metadata.maintenance_panel %}
-                        {% if 'new' in metadata.maintenance_panel.buttons %}
-                        <button id="btn-new" class="btn-action btn-new">{{ t.btn_new or 'New' }}</button>
-                        {% endif %}
-                        {% if 'edit' in metadata.maintenance_panel.buttons %}
-                        <button id="btn-edit" class="btn-action btn-edit" disabled>{{ t.btn_edit or 'Edit' }}</button>
-                        {% endif %}
-                        {% if 'delete' in metadata.maintenance_panel.buttons %}
-                        <button id="btn-delete" class="btn-action btn-delete" disabled>{{ t.btn_delete or 'Delete' }}</button>
-                        {% endif %}
-                    {% else %}
-                        <button id="btn-new" class="btn-action btn-new">New</button>
-                        <button id="btn-edit" class="btn-action btn-edit" disabled>Edit</button>
-                        <button id="btn-delete" class="btn-action btn-delete" disabled>Delete</button>
-                    {% endif %}
-                {% endblock %}
-            </div>
-
             <!-- Maintenance Form (MF) -->
             <div class="maintenance-form" id="maintenance-form">
                 {% block form_content %}

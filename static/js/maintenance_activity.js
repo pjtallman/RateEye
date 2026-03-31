@@ -1,3 +1,12 @@
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 export class MaintenanceActivityManager {
     constructor(metadata) {
         this.metadata = metadata;
@@ -83,7 +92,7 @@ export class MaintenanceActivityManager {
             const val = row.getAttribute(`data-${f.name.replace(/_/g, '-')}`) || '';
             const input = document.getElementById(`field-${f.name}`);
             if (input) {
-                // (3) Internal percentage formatting
+                // Internal percentage formatting
                 if (f.suffix === '%' && val) {
                     const num = parseFloat(val);
                     if (!isNaN(num)) {
@@ -106,7 +115,7 @@ export class MaintenanceActivityManager {
         inputs.forEach(i => i.disabled = true);
         const lookupButtons = this.maintenanceForm.querySelectorAll('.btn-lookup');
         lookupButtons.forEach(btn => btn.style.display = 'none');
-        // (1) Show refresh buttons in read mode if a row is selected
+        // Show refresh buttons in read mode if a row is selected
         const refreshButtons = this.maintenanceForm.querySelectorAll('.btn-refresh-field');
         refreshButtons.forEach(btn => {
             btn.style.display = this.selectedRow ? 'inline-block' : 'none';
@@ -121,7 +130,7 @@ export class MaintenanceActivityManager {
         });
         const lookupButtons = this.maintenanceForm.querySelectorAll('.btn-lookup');
         lookupButtons.forEach(btn => btn.style.display = 'inline-block');
-        // (1) Hide refresh buttons in edit/new mode
+        // Hide refresh buttons in edit/new mode
         const refreshButtons = this.maintenanceForm.querySelectorAll('.btn-refresh-field');
         refreshButtons.forEach(btn => btn.style.display = 'none');
     }
@@ -146,7 +155,7 @@ export class MaintenanceActivityManager {
             if (!input)
                 return false;
             let currentVal = input.value;
-            // (3) Strip % and convert back to decimal for comparison
+            // Strip % and convert back to decimal for comparison
             if (f.suffix === '%' && currentVal.endsWith('%')) {
                 const num = parseFloat(currentVal.replace('%', ''));
                 if (!isNaN(num)) {
@@ -155,7 +164,7 @@ export class MaintenanceActivityManager {
             }
             // Normalize for comparison
             const orig = this.originalData[f.name] || '';
-            if (f.suffix === '%') {
+            if (f.suffix === '%' && currentVal && orig) {
                 return parseFloat(currentVal).toFixed(6) !== parseFloat(orig).toFixed(6);
             }
             return currentVal !== orig;
@@ -206,38 +215,67 @@ export class MaintenanceActivityManager {
         this.clearMessage();
     }
     handleSave() {
-        if (!this.isNew && !this.selectedRow)
-            return;
-        if (this.isNew) {
-            this.actionForm.action = this.getCreateUrl();
-        }
-        else {
-            this.actionForm.action = this.getUpdateUrl(this.selectedRow.getAttribute('data-id'));
-        }
-        this.metadata.maintenance_panel.fields.forEach(f => {
-            const input = document.getElementById(`field-${f.name}`);
-            const hidden = document.getElementById(`form-${f.name.replace(/_/g, '-')}`);
-            if (input && hidden) {
-                let val = input.value;
-                // (3) Strip % and convert to decimal for submission
-                if (f.suffix === '%' && val.endsWith('%')) {
-                    const num = parseFloat(val.replace('%', ''));
-                    if (!isNaN(num)) {
-                        val = (num / 100).toString();
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this.isNew && !this.selectedRow)
+                return;
+            const url = this.isNew ? this.getCreateUrl() : this.getUpdateUrl(this.selectedRow.getAttribute('data-id'));
+            const formData = new URLSearchParams();
+            this.metadata.maintenance_panel.fields.forEach(f => {
+                const input = document.getElementById(`field-${f.name}`);
+                if (input) {
+                    let val = input.value;
+                    // Strip % and convert to decimal for submission
+                    if (f.suffix === '%' && val.endsWith('%')) {
+                        const num = parseFloat(val.replace('%', ''));
+                        if (!isNaN(num)) {
+                            val = (num / 100).toString();
+                        }
                     }
+                    formData.append(f.name, val);
                 }
-                hidden.value = val;
+            });
+            try {
+                this.clearMessage();
+                const resp = yield fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+                if (resp.ok) {
+                    window.location.reload();
+                }
+                else {
+                    const data = yield resp.json();
+                    this.showMessage(data.detail || "Save failed", true);
+                }
+            }
+            catch (err) {
+                this.showMessage(err.message || "An error occurred during save", true);
             }
         });
-        this.actionForm.submit();
     }
     handleDelete() {
-        if (this.isDirty() && !confirm("Discard unsaved changes?"))
-            return;
-        if (!this.selectedRow || !confirm("Are you sure you want to delete this record?"))
-            return;
-        this.actionForm.action = this.getDeleteUrl(this.selectedRow.getAttribute('data-id'));
-        this.actionForm.submit();
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.isDirty() && !confirm("Discard unsaved changes?"))
+                return;
+            if (!this.selectedRow || !confirm("Are you sure you want to delete this record?"))
+                return;
+            const url = this.getDeleteUrl(this.selectedRow.getAttribute('data-id'));
+            try {
+                this.clearMessage();
+                const resp = yield fetch(url, { method: 'POST' });
+                if (resp.ok) {
+                    window.location.reload();
+                }
+                else {
+                    const data = yield resp.json();
+                    this.showMessage(data.detail || "Delete failed", true);
+                }
+            }
+            catch (err) {
+                this.showMessage(err.message || "An error occurred during delete", true);
+            }
+        });
     }
     filterTable(field, query) {
         const rows = document.querySelectorAll('#browse-table tbody tr');
