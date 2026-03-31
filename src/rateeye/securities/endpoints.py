@@ -32,13 +32,14 @@ class BaseSecurityEndpoint(ABC):
             "EQUITY": SecurityType.STOCK.value,
             "ETF": SecurityType.ETF.value,
             "MUTUALFUND": SecurityType.MUTUAL_FUND.value,
-            "MONEYMARKET": SecurityType.MONEY_MARKET.value,
+            "MONEYMARKET": SecurityType.MUTUAL_FUND.value,  # MMFs are Mutual Funds
             "BOND": SecurityType.BOND.value
         }
         return mapping.get(yahoo_type, SecurityType.STOCK.value)
 
     def _infer_asset_class(self, info: Dict) -> Optional[str]:
         y_type = info.get("quoteType")
+        # For MMFs or anything Yahoo calls MONEYMARKET, asset class is Money Market
         if y_type == "MONEYMARKET":
             return AssetClass.MONEY_MARKET.value
         if y_type == "EQUITY":
@@ -79,6 +80,17 @@ class YahooScraperEndpoint(BaseSecurityEndpoint):
                         "type": quote.get("quoteType"),
                         "exchange": quote.get("exchange")
                     })
+                
+                # (2) Fallback: if no results, but query looks like a ticker (e.g. VUSXX), add virtual result
+                clean_query = query.strip().upper()
+                # Tickers are typically 1-10 chars, letters, numbers, dots, or dashes
+                if not results and clean_query and len(clean_query) <= 10 and all(c.isalnum() or c in ".-" for c in clean_query):
+                    results.append({
+                        "symbol": clean_query,
+                        "name": f"Check details for {clean_query}",
+                        "type": "UNKNOWN",
+                        "exchange": "N/A"
+                    })
                 return results
         except Exception as e:
             logger.error(f"Yahoo search error: {e}")
@@ -93,10 +105,13 @@ class YahooScraperEndpoint(BaseSecurityEndpoint):
             if not info or 'symbol' not in info:
                 return None
             
+            quote_type = info.get("quoteType")
+            y_val = str(info.get("yield", ""))
+            
             return {
                 "symbol": symbol,
                 "name": info.get("longName") or info.get("shortName") or symbol,
-                "security_type": self._map_security_type(info.get("quoteType")),
+                "security_type": self._map_security_type(quote_type),
                 "asset_class": self._infer_asset_class(info),
                 "current_price": str(info.get("regularMarketPrice", "")),
                 "previous_close": str(info.get("regularMarketPreviousClose", "")),
@@ -104,8 +119,9 @@ class YahooScraperEndpoint(BaseSecurityEndpoint):
                 "nav": str(info.get("navPrice", "")),
                 "range_52_week": info.get("fiftyTwoWeekRange", ""),
                 "avg_volume": str(info.get("averageDailyVolume3Month", "")),
-                "yield_30_day": str(info.get("trailingAnnualDividendYield", "")),
-                "yield_7_day": ""
+                # (2) For MMF, yield is SEC 7-day. (3) For others, yield is SEC 30-day.
+                "yield_30_day": y_val if quote_type != "MONEYMARKET" else "",
+                "yield_7_day": y_val if quote_type == "MONEYMARKET" else ""
             }
         except Exception as e:
             logger.error(f"Yahoo lookup error for '{symbol}': {e}")

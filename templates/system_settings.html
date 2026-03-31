@@ -59,10 +59,16 @@
         margin-top: 10px;
         font-weight: bold;
     }
-    .label-with-help {
+    
+    /* (1) Help icon alignment same line as Label */
+    .label-row {
         display: flex;
         align-items: center;
         gap: 8px;
+        margin-bottom: 5px;
+    }
+    .label-row label {
+        margin-bottom: 0;
     }
     .help-icon-btn {
         background: none;
@@ -105,12 +111,12 @@
             </div>
 
             <div id="api-key-group" class="form-group" style="display: none;">
-                <label for="api_key" class="label-with-help">
-                    API Key
-                    <button type="button" class="help-icon-btn" onclick="showHelp()">
+                <div class="label-row">
+                    <label for="api_key">API Key</label>
+                    <button type="button" class="help-icon-btn" onclick="showHelp()" title="How to get an API Key">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
                     </button>
-                </label>
+                </div>
                 <input type="text" id="api_key" name="api_key" value="{{ active_key }}" placeholder="Enter API Key">
             </div>
 
