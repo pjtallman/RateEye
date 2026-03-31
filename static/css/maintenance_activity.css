@@ -280,6 +280,11 @@
     cursor: pointer;
 }
 
+.lookup-result-row.selected {
+    background-color: #e0f0ff;
+    outline: 2px solid #007bff;
+}
+
 /* Help Indicator */
 .help-indicator {
     display: inline-block;

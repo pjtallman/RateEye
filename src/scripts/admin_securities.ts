@@ -7,6 +7,8 @@ class SecuritiesManager extends MaintenanceActivityManager {
     private lookupSearchInput = document.getElementById('lookup-search-input') as HTMLInputElement;
     private btnLookupSearch = document.getElementById('btn-lookup-search') as HTMLButtonElement;
     private btnCloseLookup = document.getElementById('btn-close-lookup') as HTMLButtonElement;
+    private btnOkLookup = document.getElementById('btn-ok-lookup') as HTMLButtonElement;
+    private selectedLookupSymbol: string | null = null;
 
     constructor(metadata: ActivityMetadata) {
         super(metadata);
@@ -28,7 +30,14 @@ class SecuritiesManager extends MaintenanceActivityManager {
             this.lookupModal.style.display = 'none';
         });
 
-        // (2) Refresh button listener
+        this.btnOkLookup?.addEventListener('click', () => {
+            if (this.selectedLookupSymbol) {
+                this.fetchMetadata(this.selectedLookupSymbol);
+                this.lookupModal.style.display = 'none';
+            }
+        });
+
+        // Refresh button listener
         const refreshButtons = document.querySelectorAll('.btn-refresh-field');
         refreshButtons.forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -45,7 +54,7 @@ class SecuritiesManager extends MaintenanceActivityManager {
         });
     }
 
-    // (2) Auto-fetch price when row selected
+    // Auto-fetch price when row selected
     protected override selectRow(row: HTMLElement) {
         super.selectRow(row);
         if (this.selectedRow) {
@@ -86,6 +95,9 @@ class SecuritiesManager extends MaintenanceActivityManager {
         if (this.lookupResultsCount) {
             this.lookupResultsCount.textContent = '';
         }
+        this.selectedLookupSymbol = null;
+        if (this.btnOkLookup) this.btnOkLookup.disabled = true;
+
         if (this.lookupModal) {
             this.lookupModal.style.display = 'flex';
             this.lookupSearchInput?.focus();
@@ -102,6 +114,8 @@ class SecuritiesManager extends MaintenanceActivityManager {
         try {
             this.lookupResultsList.innerHTML = '<tr><td colspan="2" style="padding: 15px;">Searching...</td></tr>';
             this.lookupResultsCount.textContent = '';
+            this.selectedLookupSymbol = null;
+            if (this.btnOkLookup) this.btnOkLookup.disabled = true;
 
             // Exact match first
             let results = await this.performSearch(query);
@@ -149,10 +163,21 @@ class SecuritiesManager extends MaintenanceActivityManager {
                     <td><strong>${res.symbol}</strong></td>
                     <td>${res.name || ''}</td>
                 `;
+                
+                // Single click to select
                 tr.addEventListener('click', () => {
+                    document.querySelectorAll('.lookup-result-row').forEach(r => r.classList.remove('selected'));
+                    tr.classList.add('selected');
+                    this.selectedLookupSymbol = res.symbol;
+                    if (this.btnOkLookup) this.btnOkLookup.disabled = false;
+                });
+
+                // Double click to apply
+                tr.addEventListener('dblclick', () => {
                     this.fetchMetadata(res.symbol);
                     this.lookupModal.style.display = 'none';
                 });
+
                 this.lookupResultsList.appendChild(tr);
             });
         }
@@ -195,7 +220,7 @@ class SecuritiesManager extends MaintenanceActivityManager {
         Object.keys(mapping).forEach(key => {
             const input = document.getElementById(`field-${key}`) as HTMLInputElement | HTMLSelectElement;
             if (input && mapping[key] !== undefined) {
-                // (3) Special handling for yields to format as percentages
+                // Special handling for yields to format as percentages
                 if (key.startsWith('yield_') && mapping[key]) {
                     const num = parseFloat(mapping[key]);
                     if (!isNaN(num)) {

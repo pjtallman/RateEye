@@ -839,11 +839,18 @@ async def create_security(
     avg_volume: Optional[str] = Form(None),
     yield_30_day: Optional[str] = Form(None),
     yield_7_day: Optional[str] = Form(None),
+    accept_language: str = Header(None),
     user: User = Depends(login_required),
     db: Session = Depends(get_db)
 ):
+    # (2) Verify uniqueness of ticker symbol
+    existing = db.query(Security).filter(Security.symbol == symbol.upper()).first()
+    if existing:
+        t = get_text(accept_language)
+        raise HTTPException(status_code=400, detail=t.get("err_duplicate_symbol", "Security with this symbol already exists."))
+
     new_sec = Security(
-        symbol=symbol,
+        symbol=symbol.upper(),
         name=name,
         security_type=security_type,
         asset_class=asset_class,
