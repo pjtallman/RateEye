@@ -1,3 +1,5 @@
+export {};
+
 interface UserRow extends HTMLTableRowElement {
     dataset: DOMStringMap & {
         userId: string;

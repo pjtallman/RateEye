@@ -3,7 +3,8 @@ import os
 import shutil
 import json
 from datetime import datetime
-from typing import Optional
+from pydantic import BaseModel
+from typing import Optional, List
 from enum import Enum
 
 # Check if we are running in a test environment
@@ -27,7 +28,8 @@ from authlib.integrations.starlette_client import OAuth
 
 # Local Imports
 from i18n import get_text
-from database import User, UserSetting, SystemSetting, Role, user_roles, engine, SessionLocal, get_db, init_db, get_system_setting, PageType, Permission, PermissionLevel, get_pages
+from database import User, UserSetting, SystemSetting, Role, user_roles, engine, SessionLocal, get_db, init_db, get_system_setting, PageType, Permission, PermissionLevel, get_pages, Security, SecurityType, AssetClass
+from src.rateeye.securities.endpoints import YahooScraperEndpoint, FinnhubEndpoint, AlphaVantageEndpoint
 
 # --- 1. LOGGING & ENVIRONMENT SETUP ---
 LOG_DIR = "logs"
@@ -48,6 +50,44 @@ def rotate_logs():
 
 
 rotate_logs()
+
+def load_metadata(activity_name: str, model_class=None) -> dict:
+    """Loads metadata for a maintenance activity from metadata/[name]_maint_activity_metadata.json or metadata/[name].json."""
+    paths = [
+        os.path.join("metadata", f"{activity_name}_maint_activity_metadata.json"),
+        os.path.join("metadata", f"{activity_name}.json")
+    ]
+    for path in paths:
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                return json.load(f)
+    
+    # Fallback to model-derived defaults
+    if model_class:
+        from sqlalchemy import inspect
+        columns = [c.key for c in inspect(model_class).mapper.column_attrs if c.key != 'id']
+        return {
+            "browse_panel": {
+                "columns": [{"name": c, "label_key": f"th_{c}"} for c in columns]
+            },
+            "maintenance_panel": {
+                "buttons": ["new", "edit", "delete"],
+                "fields": [{"name": c, "label_key": f"label_{c}", "read_only": False} for c in columns]
+            }
+        }
+    return {}
+
+def get_security_endpoint(db: Session):
+    """Factory to get the active security data endpoint based on system settings."""
+    endpoint_type = get_system_setting(db, "security_data_endpoint", "yahoo")
+    api_key = get_system_setting(db, "security_data_api_key", "")
+    
+    if endpoint_type == "finnhub":
+        return FinnhubEndpoint(api_key=api_key)
+    elif endpoint_type == "alphavantage":
+        return AlphaVantageEndpoint(api_key=api_key)
+    else:
+        return YahooScraperEndpoint()
 
 if not IS_TESTING:
     logging.basicConfig(
@@ -133,16 +173,22 @@ async def check_page_permission(
     
     path = request.url.path
     role_ids = [role.id for role in user.roles]
-    
-    # Query for any permission that grants access
-    # FULL or any CRUD level (READ, CREATE, UPDATE, DELETE)
-    # NONE is excluded by the filter on level
+
+    # Sub-path support: Try exact path first, then parent paths
+    # e.g. /admin/securities/search will check /admin/securities
+    potential_paths = [path]
+    parts = path.strip("/").split("/")
+    while len(parts) > 1:
+        parts.pop()
+        potential_paths.append("/" + "/".join(parts))
+
+    # Query for any permission that grants access to these paths
     permission = db.query(Permission).filter(
-        Permission.page_path == path,
+        Permission.page_path.in_(potential_paths),
         (Permission.user_id == user.id) | (Permission.role_id.in_(role_ids)),
         Permission.level != PermissionLevel.NONE
-    ).first()
-    
+    ).first()    
+
     if not permission:
         logger.warning(f"User {user.email} denied access to {path}")
         raise HTTPException(status_code=403, detail="Access Denied")
@@ -403,26 +449,45 @@ async def system_settings_page(
     # Future: check for admin permissions here
     t = get_text(accept_language)
     line_count = get_system_setting(db, "log_lines", "100")
+    active_endpoint = get_system_setting(db, "security_data_endpoint", "yahoo")
+    active_key = get_system_setting(db, "security_data_api_key", "")
+    
     logger.info(f"System settings page accessed by {user.email}.")
     return templates.TemplateResponse(
-        request, "system_settings.html", {"t": t, "line_count": line_count, "user": user}
+        request, "system_settings.html", {
+            "t": t, 
+            "line_count": line_count, 
+            "user": user,
+            "active_endpoint": active_endpoint,
+            "active_key": active_key
+        }
     )
 
 
 @app.post("/settings/system", tags=[PageType.SETTINGS])
 async def save_system_settings(
     log_lines: str = Form(...), 
+    security_data_endpoint: str = Form("yahoo"),
+    api_key: str = Form(""),
     user: User = Depends(login_required),
     db: Session = Depends(get_db)
 ):
     # Future: check for admin permissions here
-    setting = db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first()
-    if setting:
-        setting.value = log_lines
-    else:
-        db.add(SystemSetting(name="log_lines", value=log_lines))
+    settings_to_save = {
+        "log_lines": log_lines,
+        "security_data_endpoint": security_data_endpoint,
+        "security_data_api_key": api_key
+    }
+    
+    for name, value in settings_to_save.items():
+        setting = db.query(SystemSetting).filter(SystemSetting.name == name).first()
+        if setting:
+            setting.value = value
+        else:
+            db.add(SystemSetting(name=name, value=value))
+            
     db.commit()
-    logger.info(f"System settings saved by {user.email}. New log_lines limit: {log_lines}")
+    logger.info(f"System settings saved by {user.email}.")
     return RedirectResponse(url="/settings/system", status_code=303)
 
 
@@ -739,9 +804,240 @@ async def delete_user(
     return RedirectResponse(url="/admin/users", status_code=303)
 
 @app.get("/admin/securities", response_class=HTMLResponse, tags=[PageType.MAINTENANCE])
-async def maintenance_securities(request: Request, accept_language: str = Header(None), user: User = Depends(check_page_permission)):
+async def list_securities(
+    request: Request,
+    accept_language: str = Header(None),
+    user: User = Depends(check_page_permission),
+    db: Session = Depends(get_db)
+):
     t = get_text(accept_language)
-    return templates.TemplateResponse(request, "admin_securities.html", {"t": t, "user": user})
+    securities = db.query(Security).all()
+    metadata = load_metadata("securities", model_class=Security)
+    return templates.TemplateResponse(
+        request,
+        "admin_securities.html",
+        {
+            "t": t,
+            "title": t.get("item_securities", "Securities"),
+            "user": user,
+            "securities": securities,            "security_types": list(SecurityType),
+            "asset_classes": list(AssetClass),
+            "metadata": metadata
+        }
+    )
+
+@app.post("/admin/securities/create", tags=[PageType.MAINTENANCE])
+async def create_security(
+    symbol: str = Form(...),
+    name: str = Form(...),
+    security_type: SecurityType = Form(...),
+    asset_class: Optional[AssetClass] = Form(None),
+    previous_close: Optional[str] = Form(None),
+    open_price: Optional[str] = Form(None),
+    current_price: Optional[str] = Form(None),
+    nav: Optional[str] = Form(None),
+    range_52_week: Optional[str] = Form(None),
+    avg_volume: Optional[str] = Form(None),
+    yield_30_day: Optional[str] = Form(None),
+    yield_7_day: Optional[str] = Form(None),
+    accept_language: str = Header(None),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    # (2) Verify uniqueness of ticker symbol
+    existing = db.query(Security).filter(Security.symbol == symbol.upper()).first()
+    if existing:
+        t = get_text(accept_language)
+        raise HTTPException(status_code=400, detail=t.get("err_duplicate_symbol", "Security with this symbol already exists."))
+
+    new_sec = Security(
+        symbol=symbol.upper(),
+        name=name,
+        security_type=security_type,
+        asset_class=asset_class,
+        previous_close=previous_close,
+        open_price=open_price,
+        current_price=current_price,
+        nav=nav,
+        range_52_week=range_52_week,
+        avg_volume=avg_volume,
+        yield_30_day=yield_30_day,
+        yield_7_day=yield_7_day
+    )
+    db.add(new_sec)
+    db.commit()
+    logger.info(f"Security {symbol} created by {user.email}")
+    return RedirectResponse(url="/admin/securities", status_code=303)
+
+@app.post("/admin/securities/update/{sec_id}", tags=[PageType.MAINTENANCE])
+async def update_security(
+    sec_id: int,
+    symbol: str = Form(...),
+    name: str = Form(...),
+    security_type: SecurityType = Form(...),
+    asset_class: Optional[AssetClass] = Form(None),
+    previous_close: Optional[str] = Form(None),
+    open_price: Optional[str] = Form(None),
+    current_price: Optional[str] = Form(None),
+    nav: Optional[str] = Form(None),
+    range_52_week: Optional[str] = Form(None),
+    avg_volume: Optional[str] = Form(None),
+    yield_30_day: Optional[str] = Form(None),
+    yield_7_day: Optional[str] = Form(None),
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    sec = db.query(Security).filter(Security.id == sec_id).first()
+    if sec:
+        sec.symbol = symbol
+        sec.name = name
+        sec.security_type = security_type
+        sec.asset_class = asset_class
+        sec.previous_close = previous_close
+        sec.open_price = open_price
+        sec.current_price = current_price
+        sec.nav = nav
+        sec.range_52_week = range_52_week
+        sec.avg_volume = avg_volume
+        sec.yield_30_day = yield_30_day
+        sec.yield_7_day = yield_7_day
+        db.commit()
+        logger.info(f"Security {symbol} (ID: {sec_id}) updated by {user.email}")
+    return RedirectResponse(url="/admin/securities", status_code=303)
+
+@app.post("/admin/securities/delete/{sec_id}", tags=[PageType.MAINTENANCE])
+async def delete_security(
+    sec_id: int,
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    sec = db.query(Security).filter(Security.id == sec_id).first()
+    if sec:
+        symbol = sec.symbol
+        db.delete(sec)
+        db.commit()
+        logger.info(f"Security {symbol} deleted by {user.email}")
+    return RedirectResponse(url="/admin/securities", status_code=303)
+
+
+@app.get("/admin/securities/search", tags=[PageType.MAINTENANCE])
+async def search_securities(
+    q: str,
+    user: User = Depends(check_page_permission),
+    db: Session = Depends(get_db)
+):
+    endpoint = get_security_endpoint(db)
+    results = await endpoint.search(q)
+    return results
+
+
+@app.get("/admin/securities/lookup", tags=[PageType.MAINTENANCE])
+async def lookup_security(
+    symbol: str,
+    user: User = Depends(check_page_permission),
+    db: Session = Depends(get_db)
+):
+    endpoint = get_security_endpoint(db)
+    data = await endpoint.lookup(symbol)
+    if not data:
+        raise HTTPException(status_code=404, detail="Security not found")
+    return data
+
+class BulkCreateRequest(BaseModel):
+    symbols: List[str]
+
+@app.post("/admin/securities/bulk_create", tags=[PageType.MAINTENANCE])
+async def bulk_create_securities(
+    request: BulkCreateRequest,
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    endpoint = get_security_endpoint(db)
+    added = []
+    errors = []
+    
+    for symbol in request.symbols:
+        symbol = symbol.upper().strip()
+        if not symbol: continue
+        existing = db.query(Security).filter(Security.symbol == symbol).first()
+        if existing:
+            errors.append(f"{symbol} already exists.")
+            continue
+            
+        try:
+            data = await endpoint.lookup(symbol)
+            if data:
+                new_sec = Security(
+                    symbol=symbol,
+                    name=data.get("name", symbol),
+                    security_type=data.get("security_type", SecurityType.STOCK),
+                    asset_class=data.get("asset_class"),
+                    current_price=data.get("current_price"),
+                    previous_close=data.get("previous_close"),
+                    open_price=data.get("open_price"),
+                    nav=data.get("nav"),
+                    range_52_week=data.get("range_52_week"),
+                    avg_volume=data.get("avg_volume"),
+                    yield_30_day=data.get("yield_30_day"),
+                    yield_7_day=data.get("yield_7_day")
+                )
+                db.add(new_sec)
+                added.append(symbol)
+            else:
+                errors.append(f"{symbol} not found.")
+        except Exception as e:
+            errors.append(f"Error adding {symbol}: {str(e)}")
+            
+    db.commit()
+    
+    if errors and not added:
+        raise HTTPException(status_code=400, detail="; ".join(errors))
+        
+    return {"added": added, "errors": errors}
+
+class BulkDeleteRequest(BaseModel):
+    symbols: List[str]
+
+@app.post("/admin/securities/bulk_delete", tags=[PageType.MAINTENANCE])
+async def bulk_delete_securities(
+    request: BulkDeleteRequest,
+    user: User = Depends(login_required),
+    db: Session = Depends(get_db)
+):
+    symbols = [s.upper().strip() for s in request.symbols]
+    if not symbols:
+        return {"deleted": 0}
+        
+    deleted_count = db.query(Security).filter(Security.symbol.in_(symbols)).delete(synchronize_session=False)
+    db.commit()
+    logger.info(f"Bulk delete performed by {user.email}. {deleted_count} securities removed.")
+    return {"deleted": deleted_count}
+
+@app.post("/admin/securities/test_endpoint", tags=[PageType.SETTINGS])
+async def test_security_endpoint(
+    endpoint: str = Form(...),
+    api_key: Optional[str] = Form(None),
+    user: User = Depends(check_page_permission),
+    db: Session = Depends(get_db)
+):
+    try:
+        if endpoint == "finnhub":
+            ep = FinnhubEndpoint(api_key=api_key or "")
+        elif endpoint == "alphavantage":
+            ep = AlphaVantageEndpoint(api_key=api_key or "")
+        else:
+            ep = YahooScraperEndpoint()
+        
+        # Test with VOO
+        data = await ep.lookup("VOO")
+        if data and data.get("symbol") == "VOO":
+            return {"success": True}
+        else:
+            return {"success": False, "error": "No data returned for VOO"}
+    except Exception as e:
+        logger.error(f"Endpoint test failed: {e}")
+        return {"success": False, "error": str(e)}
+
 
 @app.get("/admin/permissions", response_class=HTMLResponse, tags=[PageType.MAINTENANCE])
 async def list_permissions(

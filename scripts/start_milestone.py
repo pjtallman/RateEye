@@ -31,9 +31,9 @@ def main():
         sys.exit(1)
 
     repo_name = get_repo_full_name()
-    milestone_name = config.get("milestone_name")
+    milestone_name = config.get("milestone")
     milestone_desc = config.get("description", "")
-    branch_name = config.get("branch_name")
+    branch_name = config.get("branch")
     issues = config.get("issues", [])
 
     print("\n" + "="*50)

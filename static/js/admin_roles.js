@@ -1,4 +1,3 @@
-"use strict";
 document.addEventListener('DOMContentLoaded', () => {
     var _a;
     const rolesTableBody = document.querySelector('#roles-table tbody');
@@ -217,3 +216,4 @@ document.addEventListener('DOMContentLoaded', () => {
     if (firstRow)
         selectRole(firstRow);
 });
+export {};

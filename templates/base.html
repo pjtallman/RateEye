@@ -23,12 +23,6 @@
             </div>
         </div>
 
-        <div class="menu-item">{{ t.menu_view }}
-            <div class="dropdown">
-                <div data-action="reload">{{ t.item_refresh }}</div>
-            </div>
-        </div>
-
         {% if user and 'Admin' in user.roles | map(attribute='name') %}
         <div class="menu-item">{{ t.menu_admin or 'Admin' }}
             <div class="dropdown">
@@ -77,6 +71,6 @@
         {% block content %}{% endblock %}
     </div>
 
-    <script src="/static/js/main.js"></script>
+    <script src="/static/js/main.js" type="module"></script>
 </body>
 </html>
