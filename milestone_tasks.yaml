@@ -1,32 +1,13 @@
-milestone: "Milestone 7: Securities"
-branch: "feat/milestone-7-securities"
-description: "Define the Securities model and build the maintenance page (CRUD)."
+milestone: "Milestone 8: Deployment validation and verification"
+branch: "feat/milestone-8-deployment"
+description: "Validate and verify deployment to a new server and access from outside this server."
 issues:
-  - title: "Implement Securities CRUD and Model Definition"
-    labels: ["feature", "milestone-7"]
+  - title: "Validate and verify deployment"
+    labels: ["feature", "milestone-8"]
     description: |
-      Define the Securities model and build the maintenance page (CRUD) to allow users to manage tracked securities.
-
-      ### Security Types Supported:
-      - Stock
-      - Bond (includes Notes and Bills)
-      - Mutual Funds
-      - ETF
-      - Money Market
+      Validate and verify deployment to a new server and access from outside this server.
 
       ### Requirements:
-      - **UI:** Create a maintenance page for defining securities.
-      - **Lookup Tool:** Implement a lookup feature (button/link) next to the Symbol field to fetch security details by name or symbol.
-      - **Data Scraper:** Research and implement a web scraper to extract free metadata from reliable web sources.
-
-      ### Data Fields (Mandatory marked with *):
-      - Symbol* (e.g., VOO)
-      - Name* (e.g., Vanguard S&P 500 ETF)
-      - Previous Close
-      - Open
-      - Current Price
-      - NAV
-      - 52 Week Range
-      - Avg. Volume
-      - 30 Day Yield (Stocks, Bonds, Bond/Stock Mutual Funds & ETFs)
-      - 7 Day Yield (Money Market & Money Market Mutual Funds)
+      - Sucessfully deploy RateEye from GitHub to a server.
+      - Validate RateEye has deployed accessing via WebBrowser from a separate computer.
+    

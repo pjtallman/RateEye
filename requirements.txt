@@ -13,3 +13,4 @@ pytest-asyncio
 beautifulsoup4
 yfinance
 curl_cffi
+PyYAML
