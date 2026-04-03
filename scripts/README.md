@@ -26,11 +26,14 @@ The `start_milestone.py` script automates the creation of a GitHub Milestone, a 
 3. **Run the script:**
    ```bash
    # On Mac/Linux:
+   export PYTHONPATH=$PYTHONPATH:$(pwd)/src
    .venv/bin/python scripts/start_milestone.py
 
    # On Windows:
+   $env:PYTHONPATH += ";$(Get-Location)\src"
    .venv\Scripts\python scripts/start_milestone.py
    ```
+
 4. **Action:** Follow the prompts to confirm the initialization.
 
 ---
@@ -44,11 +47,14 @@ The `release.py` script automates the final steps of a milestone: creating a Pul
 2. **Run the script:**
    ```bash
    # On Mac/Linux:
+   export PYTHONPATH=$PYTHONPATH:$(pwd)/src
    .venv/bin/python scripts/release.py --version v1.0.4
 
    # On Windows:
+   $env:PYTHONPATH += ";$(Get-Location)\src"
    .venv\Scripts\python scripts/release.py --version v1.0.4
    ```
+
    *(Replace `v1.0.4` with your target release tag)*.
 3. **Action:**
    - The script will show a "Plan of Action".

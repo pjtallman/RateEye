@@ -1,5 +1,5 @@
 import pytest
-from database import User, pwd_context
+from rateeye.database import User, pwd_context
 
 def test_register_user(client, db):
     response = client.post(
@@ -41,8 +41,7 @@ def test_login_failure(client, test_user):
         follow_redirects=False
     )
     assert response.status_code == 200
-    assert "Invalid email/username or password" in response.text
-
+    assert "Invalid email or password" in response.text
 def test_logout(client, test_user):
     # Log in first
     client.post(
@@ -95,7 +94,7 @@ def test_change_password_success(client, test_user):
     assert "index.html" in response.template.name
     
     # Verify in DB
-    from database import SessionLocal
+    from rateeye.database import SessionLocal
     # We need a new session or refresh to see changes made via client if they are in a different session context
     # But since we use the same 'db' fixture, it should be fine.
     # Wait, the client uses a different db session (the one yielded by get_db override).

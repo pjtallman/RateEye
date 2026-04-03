@@ -3,8 +3,8 @@
     "target": "ES2016",
     "module": "ESNext",
     "moduleResolution": "node",
-    "outDir": "static/js",
-    "rootDir": "src/scripts",
+    "outDir": "src/rateeye/static/js",
+    "rootDir": "src/frontend",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -12,5 +12,5 @@
     "lib": ["DOM", "ES2016"],
     "ignoreDeprecations": "6.0"
   },
-  "include": ["src/scripts/**/*.ts"]
+  "include": ["src/frontend/**/*.ts"]
 }

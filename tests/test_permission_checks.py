@@ -1,5 +1,5 @@
 import pytest
-from database import Permission, PermissionLevel, Role, User, PageType, init_db
+from rateeye.database import Permission, PermissionLevel, Role, User, PageType, init_db
 
 def test_admin_access_maintenance(client, db, test_admin):
     init_db(db)
@@ -13,7 +13,8 @@ def test_admin_access_maintenance(client, db, test_admin):
 
 def test_user_denied_maintenance(client, db, test_user):
     user_role = db.query(Role).filter(Role.name == "User").first()
-    test_user.roles.append(user_role)
+    if user_role not in test_user.roles:
+        test_user.roles.append(user_role)
     db.commit()
     init_db(db)
 
@@ -26,7 +27,8 @@ def test_user_denied_maintenance(client, db, test_user):
 
 def test_user_access_settings(client, db, test_user):
     user_role = db.query(Role).filter(Role.name == "User").first()
-    test_user.roles.append(user_role)
+    if user_role not in test_user.roles:
+        test_user.roles.append(user_role)
     db.commit()
     init_db(db)
 

@@ -1,8 +1,8 @@
 import pytest
 import json
 import os
-from database import Security, SecurityType, AssetClass, init_db
-from main import load_metadata
+from rateeye.database import Security, SecurityType, AssetClass, init_db
+from rateeye.main import load_metadata
 
 def test_load_metadata_pattern(db):
     # Test that it finds the new pattern
@@ -46,7 +46,7 @@ def test_dev_version(client, db):
     init_db(db)
     resp = client.get("/about")
     assert resp.status_code == 200
-    assert "1.0.4_dev" in resp.text
+    assert "1.0.5_dev" in resp.text
 
 def test_layout_panels_presence(client, test_admin, db):
     init_db(db)

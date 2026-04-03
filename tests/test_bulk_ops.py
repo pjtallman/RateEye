@@ -3,7 +3,7 @@ import pytest
 # Since I'm in a CLI, I'll verify the backend logic for bulk creation instead.
 
 def test_bulk_create_endpoint(client, test_admin, db):
-    from database import init_db, Security
+    from rateeye.database import init_db, Security
     init_db(db)
     client.post("/login", data={"email": test_admin.email, "password": "adminpassword"}, follow_redirects=False)
     
@@ -21,7 +21,7 @@ def test_bulk_create_endpoint(client, test_admin, db):
     assert len(secs) == 2
 
 def test_bulk_create_duplicates(client, test_admin, db):
-    from database import init_db, Security
+    from rateeye.database import init_db, Security
     init_db(db)
     client.post("/login", data={"email": test_admin.email, "password": "adminpassword"}, follow_redirects=False)
     
@@ -36,7 +36,7 @@ def test_bulk_create_duplicates(client, test_admin, db):
     assert "GOOG" in data["added"]
 
 def test_bulk_delete_endpoint(client, test_admin, db):
-    from database import init_db, Security
+    from rateeye.database import init_db, Security
     init_db(db)
     client.post("/login", data={"email": test_admin.email, "password": "adminpassword"}, follow_redirects=False)
     

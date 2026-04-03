@@ -10,7 +10,11 @@ def check_environment():
     ready = True
     
     # 1. Check for necessary configuration files
-    required_files = ["VERSION", "translations.json"]
+    required_files = [
+        "VERSION", 
+        "src/rateeye/locales/translations.json",
+        "requirements.txt"
+    ]
     for file in required_files:
         if not os.path.exists(file):
             logger.error(f"Missing required file: {file}")
@@ -18,14 +22,14 @@ def check_environment():
         else:
             logger.info(f"Found required file: {file}")
 
-    # 2. Check for critical environment variables (if any)
-    # For now, let's just check for DATABASE_URL as an example
-    # db_url = os.environ.get("DATABASE_URL")
-    # if not db_url:
-    #     logger.warning("DATABASE_URL environment variable is not set. Using default.")
-
-    # 3. Check for necessary directories
-    required_dirs = ["static", "templates", "logs", "static/uploads/profile_photos"]
+    # 2. Check for necessary directories
+    required_dirs = [
+        "src/rateeye/static", 
+        "src/rateeye/templates", 
+        "logs", 
+        "src/rateeye/static/uploads/profile_photos",
+        "data"
+    ]
     for directory in required_dirs:
         if not os.path.exists(directory):
             logger.error(f"Missing required directory: {directory}")

@@ -5,13 +5,13 @@ from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
 # Must set this before importing app or database
-os.environ["DATABASE_URL"] = "sqlite:///./test_rateeye.db"
+os.environ["DATABASE_URL"] = "sqlite:///./data/test_rateeye.db"
 
-from database import Base, get_db, User, UserSetting, SystemSetting, Role, pwd_context, user_roles, Security
-from main import app
+from rateeye.database import Base, get_db, User, UserSetting, SystemSetting, Role, pwd_context, user_roles, Security
+from rateeye.main import app
 
 # Test database setup
-TEST_DATABASE_URL = "sqlite:///./test_rateeye.db"
+TEST_DATABASE_URL = "sqlite:///./data/test_rateeye.db"
 engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -21,26 +21,21 @@ def setup_database():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     
-    # Initialize some system settings if needed
+    # Initialize session for seeding
     db = TestingSessionLocal()
-    if not db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first():
-        db.add(SystemSetting(name="log_lines", value="100"))
     
-    # Seed default roles for tests
-    if not db.query(Role).filter(Role.name == "Admin").first():
-        db.add(Role(name="Admin", description="Admin Role"))
-    if not db.query(Role).filter(Role.name == "User").first():
-        db.add(Role(name="User", description="User Role"))
+    # Seed default roles, permissions, and settings for tests
+    from rateeye.database import init_db
+    init_db(db)
         
-    db.commit()
     db.close()
     
     yield
     
     # Cleanup after all tests
     Base.metadata.drop_all(bind=engine)
-    if os.path.exists("./test_rateeye.db"):
-        os.remove("./test_rateeye.db")
+    if os.path.exists("./data/test_rateeye.db"):
+        os.remove("./data/test_rateeye.db")
 
 @pytest.fixture
 def db():

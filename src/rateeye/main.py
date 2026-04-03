@@ -27,18 +27,24 @@ from passlib.context import CryptContext
 from authlib.integrations.starlette_client import OAuth
 
 # Local Imports
-from i18n import get_text
-from database import User, UserSetting, SystemSetting, Role, user_roles, engine, SessionLocal, get_db, init_db, get_system_setting, PageType, Permission, PermissionLevel, get_pages, Security, SecurityType, AssetClass
-from src.rateeye.securities.endpoints import YahooScraperEndpoint, FinnhubEndpoint, AlphaVantageEndpoint
+from .i18n import get_text
+from .database import User, UserSetting, SystemSetting, Role, user_roles, engine, SessionLocal, get_db, init_db, get_system_setting, PageType, Permission, PermissionLevel, get_pages, Security, SecurityType, AssetClass
+from .securities.endpoints import YahooScraperEndpoint, FinnhubEndpoint, AlphaVantageEndpoint
 
 # --- 1. LOGGING & ENVIRONMENT SETUP ---
-LOG_DIR = "logs"
+LOG_DIR = os.environ.get("LOG_DIR", "logs")
 ACTIVE_LOG = os.path.join(LOG_DIR, "RateEye.log")
+
+# Get the base directory of the package
+BASE_DIR = os.path.dirname(__file__)
 
 def rotate_logs():
     """Rotates the production log file daily. Skipped during unit tests."""
     if IS_TESTING:
         return
+
+    if not os.path.exists(LOG_DIR):
+        os.makedirs(LOG_DIR)
 
     today_str = datetime.now().strftime("%Y%m%d")
     archive_name = os.path.join(LOG_DIR, f"{today_str}_RateEye.log")
@@ -53,9 +59,10 @@ rotate_logs()
 
 def load_metadata(activity_name: str, model_class=None) -> dict:
     """Loads metadata for a maintenance activity from metadata/[name]_maint_activity_metadata.json or metadata/[name].json."""
+    metadata_dir = os.path.join(BASE_DIR, "metadata")
     paths = [
-        os.path.join("metadata", f"{activity_name}_maint_activity_metadata.json"),
-        os.path.join("metadata", f"{activity_name}.json")
+        os.path.join(metadata_dir, f"{activity_name}_maint_activity_metadata.json"),
+        os.path.join(metadata_dir, f"{activity_name}.json")
     ]
     for path in paths:
         if os.path.exists(path):
@@ -151,8 +158,8 @@ def login_required(user: Optional[User] = Depends(get_current_user)):
 # --- 4. APP SETUP ---
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, max_age=86400)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 
 @app.exception_handler(403)
@@ -1113,7 +1120,7 @@ async def create_permission(
     user_id = int(subject_id) if subject_type == "user" else None
     
     # Find page type for this path
-    page_type = next((pt for path, pt in get_pages() if path == page_path), PageType.INFO)
+    page_type = next((pt for p_path, pt, label in get_pages() if p_path == page_path), PageType.INFO)
 
     # Exclusivity Logic
     if level in [PermissionLevel.FULL, PermissionLevel.NONE]:
@@ -1171,7 +1178,7 @@ async def delete_subject_permissions(
     
     # User requirement: MUST have at least one permission.
     # If we deleted all, reset to NONE.
-    page_type = next((pt for path, pt in get_pages() if path == page_path), PageType.INFO)
+    page_type = next((pt for p_path, pt, label in get_pages() if p_path == page_path), PageType.INFO)
     new_perm = Permission(page_path=page_path, page_type=page_type, role_id=role_id, user_id=user_id, level=PermissionLevel.NONE)
     db.add(new_perm)
     
@@ -1203,7 +1210,7 @@ async def delete_permission(
         
         if count == 0:
             # Add NONE
-            page_type = next((pt for p_path, pt in get_pages() if p_path == path), PageType.INFO)
+            page_type = next((pt for p_path, pt, label in get_pages() if p_path == path), PageType.INFO)
             db.add(Permission(page_path=path, page_type=page_type, role_id=role_id, user_id=user_id, level=PermissionLevel.NONE))
             db.commit()
 
