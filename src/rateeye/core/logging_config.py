@@ -9,6 +9,7 @@ from ..database import get_system_setting
 LOG_DIR = os.environ.get("LOG_DIR", "logs")
 ACTIVE_LOG = os.path.join(LOG_DIR, "RateEye.log")
 STARTUP_LOG = os.path.join(LOG_DIR, "startup.log")
+TEST_LOG = os.path.join(LOG_DIR, "test_RateEye.log")
 
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
@@ -43,7 +44,7 @@ def rotate_logs(is_testing: bool):
     if is_testing:
         return
     today_str = datetime.now().strftime("%Y%m%d")
-    for active, suffix in [(ACTIVE_LOG, "RateEye.log"), (STARTUP_LOG, "startup.log")]:
+    for active, suffix in [(ACTIVE_LOG, "RateEye.log"), (STARTUP_LOG, "startup.log"), (TEST_LOG, "test_RateEye.log")]:
         archive = os.path.join(LOG_DIR, f"{today_str}_{suffix}")
         if os.path.exists(active) and not os.path.exists(archive):
             shutil.copy(active, archive)
@@ -64,6 +65,7 @@ def cleanup_logs(db: Session, is_testing: bool):
         if not filename.endswith(".log") or "_" not in filename:
             continue
         try:
+            # Format is YYYYMMDD_suffix.log
             date_str, suffix = filename.split("_", 1)
             setting_name = retention_map.get(suffix)
             if not setting_name:
