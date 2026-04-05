@@ -128,17 +128,15 @@ def init_db(db: Session = None):
         standalone = True
     
     # 1. Seed initial system settings
-    log_lines = db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first()
-    if not log_lines:
-        db.add(SystemSetting(name="log_lines", value="100", is_system=True))
-
-    app_log_retention = db.query(SystemSetting).filter(SystemSetting.name == "app_log_retention").first()
-    if not app_log_retention:
-        db.add(SystemSetting(name="app_log_retention", value="10", is_system=True))
-
-    startup_log_retention = db.query(SystemSetting).filter(SystemSetting.name == "startup_log_retention").first()
-    if not startup_log_retention:
-        db.add(SystemSetting(name="startup_log_retention", value="10", is_system=True))
+    log_defaults = {
+        "app_log_lines": "100", "app_log_retention": "10",
+        "test_log_lines": "100", "test_log_retention": "10",
+        "startup_log_lines": "100", "startup_log_retention": "10",
+        "version": "unknown" # Placeholder, updated below
+    }
+    for name, value in log_defaults.items():
+        if not db.query(SystemSetting).filter(SystemSetting.name == name).first():
+            db.add(SystemSetting(name=name, value=value, is_system=True))
 
     # Sync version from file system
     if os.path.exists("VERSION"):
@@ -146,11 +144,11 @@ def init_db(db: Session = None):
             current_version = f.read().strip()
             if current_version:
                 version_setting = db.query(SystemSetting).filter(SystemSetting.name == "version").first()
-                if not version_setting:
-                    db.add(SystemSetting(name="version", value=current_version, is_system=True))
-                elif version_setting.value != current_version:
+                if version_setting:
                     version_setting.value = current_version
                     version_setting.is_system = True
+                else:
+                    db.add(SystemSetting(name="version", value=current_version, is_system=True))
     
     # 2. Seed default roles
     admin_role = db.query(Role).filter(Role.name == "Admin").first()

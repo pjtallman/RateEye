@@ -81,16 +81,22 @@ def rotate_logs():
 def cleanup_logs(db: Session):
     """Deletes old log archives based on system retention settings."""
     if IS_TESTING: return
-    app_days = int(get_system_setting(db, "app_log_retention", "10"))
-    start_days = int(get_system_setting(db, "startup_log_retention", "10"))
+    retention_map = {
+        "RateEye.log": "app_log_retention",
+        "startup.log": "startup_log_retention",
+        "test_RateEye.log": "test_log_retention"
+    }
     now = datetime.now()
     for filename in os.listdir(LOG_DIR):
         if not filename.endswith(".log") or "_" not in filename: continue
         try:
-            date_str = filename.split("_")[0]
+            date_str, suffix = filename.split("_", 1)
+            setting_name = retention_map.get(suffix)
+            if not setting_name: continue
+            
+            days = int(get_system_setting(db, setting_name, "10"))
             file_date = datetime.strptime(date_str, "%Y%m%d")
-            diff = (now - file_date).days
-            if ("RateEye.log" in filename and diff >= app_days) or ("startup.log" in filename and diff >= start_days):
+            if (now - file_date).days >= days:
                 os.remove(os.path.join(LOG_DIR, filename))
                 logger.info(f"Deleted old log: {filename}")
         except Exception as e: logger.error(f"Error cleaning {filename}: {e}")
@@ -376,8 +382,9 @@ async def system_export(filename: str = Form(...), include_logging: bool = Form(
     export_payload = {"metadata": {"type": "system_config", "version": get_system_setting(db, "version", "unknown"), "timestamp": datetime.now().isoformat()}}
     settings_data = {}
     if include_logging:
-        s = db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first()
-        if s: settings_data["log_lines"] = s.value
+        for k in ["app_log_lines", "app_log_retention", "startup_log_lines", "startup_log_retention", "test_log_lines", "test_log_retention"]:
+            s = db.query(SystemSetting).filter(SystemSetting.name == k).first()
+            if s: settings_data[k] = s.value
     if include_endpoints:
         for k in ["security_data_endpoint", "security_data_api_key"]:
             s = db.query(SystemSetting).filter(SystemSetting.name == k).first()
@@ -435,9 +442,12 @@ async def system_import(file: UploadFile = File(...), include_logging: bool = Fo
         if data.get("metadata", {}).get("type") != "system_config": raise Exception("Invalid file type")
         if "system_settings" in data:
             s_data = data["system_settings"]
-            if include_logging and "log_lines" in s_data:
-                s = db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first()
-                if s: s.value = s_data["log_lines"]
+            if include_logging:
+                for k in ["app_log_lines", "app_log_retention", "startup_log_lines", "startup_log_retention", "test_log_lines", "test_log_retention"]:
+                    if k in s_data:
+                        s = db.query(SystemSetting).filter(SystemSetting.name == k).first()
+                        if s: s.value = s_data[k]
+                        else: db.add(SystemSetting(name=k, value=s_data[k], is_system=True))
             if include_endpoints:
                 for k in ["security_data_endpoint", "security_data_api_key"]:
                     if k in s_data:
@@ -497,27 +507,47 @@ async def upload_photo(file: UploadFile = File(...), user: User = Depends(login_
 async def system_settings_page(request: Request, accept_language: str = Header(None), user: User = Depends(check_page_permission), db: Session = Depends(get_db)):
     t = get_text(accept_language)
     return templates.TemplateResponse(request, "system_settings.html", {
-        "t": t, "line_count": get_system_setting(db, "log_lines", "100"), "user": user,
+        "t": t, "user": user,
+        "app_log_lines": get_system_setting(db, "app_log_lines", "100"),
         "app_log_retention": get_system_setting(db, "app_log_retention", "10"),
+        "startup_log_lines": get_system_setting(db, "startup_log_lines", "100"),
         "startup_log_retention": get_system_setting(db, "startup_log_retention", "10"),
+        "test_log_lines": get_system_setting(db, "test_log_lines", "100"),
+        "test_log_retention": get_system_setting(db, "test_log_retention", "10"),
         "active_endpoint": get_system_setting(db, "security_data_endpoint", "yahoo"),
         "active_key": get_system_setting(db, "security_data_api_key", "")
     })
 
 @app.post("/settings/system", tags=[PageType.SETTINGS])
-async def save_system_settings(log_lines: str = Form(...), app_log_retention: str = Form("10"), startup_log_retention: str = Form("10"), security_data_endpoint: str = Form("yahoo"), api_key: str = Form(""), user: User = Depends(login_required), db: Session = Depends(get_db)):
-    for n, v in {"log_lines": log_lines, "app_log_retention": app_log_retention, "startup_log_retention": startup_log_retention, "security_data_endpoint": security_data_endpoint, "security_data_api_key": api_key}.items():
+async def save_system_settings(
+    app_log_lines: str = Form("100"), app_log_retention: str = Form("10"),
+    startup_log_lines: str = Form("100"), startup_log_retention: str = Form("10"),
+    test_log_lines: str = Form("100"), test_log_retention: str = Form("10"),
+    security_data_endpoint: str = Form("yahoo"), api_key: str = Form(""), 
+    user: User = Depends(login_required), db: Session = Depends(get_db)
+):
+    settings = {
+        "app_log_lines": app_log_lines, "app_log_retention": app_log_retention,
+        "startup_log_lines": startup_log_lines, "startup_log_retention": startup_log_retention,
+        "test_log_lines": test_log_lines, "test_log_retention": test_log_retention,
+        "security_data_endpoint": security_data_endpoint, "security_data_api_key": api_key
+    }
+    for n, v in settings.items():
         s = db.query(SystemSetting).filter(SystemSetting.name == n).first()
         if s: s.value = v
         else: db.add(SystemSetting(name=n, value=v, is_system=True))
     db.commit(); return RedirectResponse(url="/settings/system", status_code=303)
 
 @app.get("/show-log", response_class=PlainTextResponse, tags=[PageType.INFO])
-async def show_log(db: Session = Depends(get_db)):
-    if os.path.exists(ACTIVE_LOG):
-        with open(ACTIVE_LOG, "r") as f:
-            return "".join(f.readlines()[-int(get_system_setting(db, "log_lines", "100")):])
-    return "Log not found"
+async def show_log(type: str = "app", db: Session = Depends(get_db)):
+    log_map = {"app": (ACTIVE_LOG, "app_log_lines"), "startup": (STARTUP_LOG, "startup_log_lines"), "test": (os.path.join(LOG_DIR, "test_RateEye.log"), "test_log_lines")}
+    path, setting = log_map.get(type, (ACTIVE_LOG, "app_log_lines"))
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            lines = f.readlines()
+            count = int(get_system_setting(db, setting, "100"))
+            return "".join(lines[-count:])
+    return f"Log file not found: {path}"
 
 @app.get("/about", response_class=HTMLResponse, tags=[PageType.INFO])
 async def about_page(request: Request, accept_language: str = Header(None), db: Session = Depends(get_db), user: Optional[User] = Depends(get_current_user)):
