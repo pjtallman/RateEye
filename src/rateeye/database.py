@@ -132,6 +132,14 @@ def init_db(db: Session = None):
     if not log_lines:
         db.add(SystemSetting(name="log_lines", value="100", is_system=True))
 
+    app_log_retention = db.query(SystemSetting).filter(SystemSetting.name == "app_log_retention").first()
+    if not app_log_retention:
+        db.add(SystemSetting(name="app_log_retention", value="10", is_system=True))
+
+    startup_log_retention = db.query(SystemSetting).filter(SystemSetting.name == "startup_log_retention").first()
+    if not startup_log_retention:
+        db.add(SystemSetting(name="startup_log_retention", value="10", is_system=True))
+
     # Sync version from file system
     if os.path.exists("VERSION"):
         with open("VERSION", "r") as f:

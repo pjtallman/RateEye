@@ -48,7 +48,13 @@ if not os.path.exists(LOG_DIR):
 
 # Initialize Startup Logging
 if not IS_TESTING:
-    # Clear old startup log
+    # Rotate old startup log before clearing if it exists
+    if os.path.exists(STARTUP_LOG):
+        today_str = datetime.now().strftime("%Y%m%d")
+        archive_name = os.path.join(LOG_DIR, f"{today_str}_startup.log")
+        if not os.path.exists(archive_name):
+            shutil.copy(STARTUP_LOG, archive_name)
+    
     with open(STARTUP_LOG, "w") as f:
         f.write(f"--- RateEye Startup at {datetime.now()} ---\n")
     
@@ -63,17 +69,31 @@ if not IS_TESTING:
 logger = logging.getLogger(__name__)
 
 def rotate_logs():
-    """Rotates the production log file daily. Skipped during unit tests."""
-    if IS_TESTING:
-        return
-
+    """Rotates the production log files daily. Skipped during unit tests."""
+    if IS_TESTING: return
     today_str = datetime.now().strftime("%Y%m%d")
-    archive_name = os.path.join(LOG_DIR, f"{today_str}_RateEye.log")
-    if os.path.exists(ACTIVE_LOG):
-        if not os.path.exists(archive_name):
-            shutil.copy(ACTIVE_LOG, archive_name)
-            with open(ACTIVE_LOG, "w") as f:
-                f.write(f"--- Log Rotated/Started at {datetime.now()} ---\n")
+    for active, suffix in [(ACTIVE_LOG, "RateEye.log"), (STARTUP_LOG, "startup.log")]:
+        archive = os.path.join(LOG_DIR, f"{today_str}_{suffix}")
+        if os.path.exists(active) and not os.path.exists(archive):
+            shutil.copy(active, archive)
+            with open(active, "w") as f: f.write(f"--- Log Rotated at {datetime.now()} ---\n")
+
+def cleanup_logs(db: Session):
+    """Deletes old log archives based on system retention settings."""
+    if IS_TESTING: return
+    app_days = int(get_system_setting(db, "app_log_retention", "10"))
+    start_days = int(get_system_setting(db, "startup_log_retention", "10"))
+    now = datetime.now()
+    for filename in os.listdir(LOG_DIR):
+        if not filename.endswith(".log") or "_" not in filename: continue
+        try:
+            date_str = filename.split("_")[0]
+            file_date = datetime.strptime(date_str, "%Y%m%d")
+            diff = (now - file_date).days
+            if ("RateEye.log" in filename and diff >= app_days) or ("startup.log" in filename and diff >= start_days):
+                os.remove(os.path.join(LOG_DIR, filename))
+                logger.info(f"Deleted old log: {filename}")
+        except Exception as e: logger.error(f"Error cleaning {filename}: {e}")
 
 
 def finalize_logging():
@@ -181,7 +201,10 @@ rotate_logs()
 # Initialize database
 if not IS_TESTING:
     logger.info("Initializing database...")
-    init_db()
+    db = SessionLocal()
+    init_db(db)
+    cleanup_logs(db)
+    db.close()
     finalize_logging()
 
 # --- 3. AUTH & SECURITY SETUP ---
@@ -475,16 +498,18 @@ async def system_settings_page(request: Request, accept_language: str = Header(N
     t = get_text(accept_language)
     return templates.TemplateResponse(request, "system_settings.html", {
         "t": t, "line_count": get_system_setting(db, "log_lines", "100"), "user": user,
+        "app_log_retention": get_system_setting(db, "app_log_retention", "10"),
+        "startup_log_retention": get_system_setting(db, "startup_log_retention", "10"),
         "active_endpoint": get_system_setting(db, "security_data_endpoint", "yahoo"),
         "active_key": get_system_setting(db, "security_data_api_key", "")
     })
 
 @app.post("/settings/system", tags=[PageType.SETTINGS])
-async def save_system_settings(log_lines: str = Form(...), security_data_endpoint: str = Form("yahoo"), api_key: str = Form(""), user: User = Depends(login_required), db: Session = Depends(get_db)):
-    for n, v in {"log_lines": log_lines, "security_data_endpoint": security_data_endpoint, "security_data_api_key": api_key}.items():
+async def save_system_settings(log_lines: str = Form(...), app_log_retention: str = Form("10"), startup_log_retention: str = Form("10"), security_data_endpoint: str = Form("yahoo"), api_key: str = Form(""), user: User = Depends(login_required), db: Session = Depends(get_db)):
+    for n, v in {"log_lines": log_lines, "app_log_retention": app_log_retention, "startup_log_retention": startup_log_retention, "security_data_endpoint": security_data_endpoint, "security_data_api_key": api_key}.items():
         s = db.query(SystemSetting).filter(SystemSetting.name == n).first()
         if s: s.value = v
-        else: db.add(SystemSetting(name=n, value=v))
+        else: db.add(SystemSetting(name=n, value=v, is_system=True))
     db.commit(); return RedirectResponse(url="/settings/system", status_code=303)
 
 @app.get("/show-log", response_class=PlainTextResponse, tags=[PageType.INFO])

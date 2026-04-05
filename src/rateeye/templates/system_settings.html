@@ -14,6 +14,14 @@
                 <label for="log_lines">{{ t.label_log_lines }}</label>
                 <input type="number" id="log_lines" name="log_lines" value="{{ line_count }}">
             </div>
+            <div class="form-group">
+                <label for="app_log_retention">{{ t.label_app_log_retention }}</label>
+                <input type="number" id="app_log_retention" name="app_log_retention" value="{{ app_log_retention }}">
+            </div>
+            <div class="form-group">
+                <label for="startup_log_retention">{{ t.label_startup_log_retention }}</label>
+                <input type="number" id="startup_log_retention" name="startup_log_retention" value="{{ startup_log_retention }}">
+            </div>
         </div>
 
         <!-- Security Data Endpoints -->
