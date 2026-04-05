@@ -22,21 +22,21 @@
                 <div data-href="/admin/securities">{{ t.item_securities or 'Securities' }}</div>
             </div>
         </div>
+{% if user and 'Admin' in user.roles | map(attribute='name') %}
+<div class="menu-item">{{ t.menu_admin or 'Admin' }}
+    <div class="dropdown">
+        <div data-href="/admin/roles">{{ t.item_roles or 'Roles' }}</div>
+        <div data-href="/admin/permissions">{{ t.item_permissions or 'Permissions' }}</div>
+        <div data-href="/admin/users">{{ t.item_users or 'Users' }}</div>
+        <div class="menu-separator"></div>
+        <div data-href="/settings/system">{{ t.item_system_settings }}</div>
+        <div data-href="/admin/settings/export">{{ t.link_system_export }}</div>
+        <div data-href="/admin/settings/import">{{ t.link_system_import }}</div>
+    </div>
+</div>
+{% endif %}
 
-        {% if user and 'Admin' in user.roles | map(attribute='name') %}
-        <div class="menu-item">{{ t.menu_admin or 'Admin' }}
-            <div class="dropdown">
-                <div data-href="/admin/roles">{{ t.item_roles or 'Roles' }}</div>
-                <div data-href="/admin/permissions">{{ t.item_permissions or 'Permissions' }}</div>
-                <div class="menu-separator"></div>
-                <div data-href="/admin/users">{{ t.item_users or 'Users' }}</div>
-                <div class="menu-separator"></div>
-                <div data-href="/settings/system">{{ t.item_system_settings }}</div>
-            </div>
-        </div>
-        {% endif %}
-
-        <div class="menu-item">{{ t.menu_help }}
+<div class="menu-item">{{ t.menu_help }}
             <div class="dropdown">
                 <div data-href="/show-log" data-target="_blank">{{ t.item_show_log }}</div>
                 <div data-href="/about">{{ t.item_about }}</div>
@@ -58,6 +58,10 @@
                     {% endif %}
                     <div class="dropdown" style="left: auto; right: 0;">
                         <div data-href="/settings/user">{{ t.item_user_settings }}</div>
+                        <div data-href="/settings/export">{{ t.link_export_data }}</div>
+                        <div data-href="/settings/import">{{ t.link_import_data }}</div>
+                        <div class="menu-separator"></div>
+                        <div data-href="/logout">{{ t.nav_logout }}</div>
                     </div>
                 </div>
             {% else %}

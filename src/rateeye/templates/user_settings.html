@@ -3,6 +3,7 @@
 {% block title %}{{ t.item_user_settings }}{% endblock %}
 
 {% block content %}
+<div class="settings-container">
     <h1>{{ t.heading_user_settings }}</h1>
     
     <div style="margin-top: 30px; display: flex; gap: 40px; align-items: flex-start;">
@@ -28,4 +29,5 @@
             <p><a href="/settings/user/change-password" class="btn">{{ t.link_change_password }}</a></p>
         </div>
     </div>
+</div>
 {% endblock %}

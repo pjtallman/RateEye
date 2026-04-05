@@ -43,13 +43,16 @@ def db():
     transaction = connection.begin()
     session = TestingSessionLocal(bind=connection)
     
-    # We want to start each test with a clean-ish database, 
-    # but keep the seeded roles.
-    # Clear users and user_roles, but keep Roles.
+    # We want to start each test with a clean database state.
+    from rateeye.database import init_db, Permission
     session.execute(user_roles.delete())
     session.query(User).delete()
     session.query(Security).delete()
+    session.query(Permission).delete()
     session.commit()
+
+    # Re-seed for every test to ensure consistent state
+    init_db(session)
 
     yield session
     

@@ -50,6 +50,7 @@ class SystemSetting(Base):
     __tablename__ = "system_settings"
     name = Column(String, primary_key=True, index=True)
     value = Column(String)
+    is_system = Column(Boolean, default=False)
 
 class UserSetting(Base):
     __tablename__ = "user_settings"
@@ -68,6 +69,7 @@ class Permission(Base):
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     level = Column(SQLEnum(PermissionLevel), nullable=False, default=PermissionLevel.NONE)
+    is_system = Column(Boolean, default=False)
 
     role = relationship("Role", back_populates="permissions")
     user = relationship("User", back_populates="permissions")
@@ -94,6 +96,7 @@ class Role(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
     description = Column(String)
+    is_system = Column(Boolean, default=False)
     
     users = relationship("User", secondary=user_roles, back_populates="roles")
     permissions = relationship("Permission", back_populates="role", cascade="all, delete-orphan")
@@ -127,7 +130,7 @@ def init_db(db: Session = None):
     # 1. Seed initial system settings
     log_lines = db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first()
     if not log_lines:
-        db.add(SystemSetting(name="log_lines", value="100"))
+        db.add(SystemSetting(name="log_lines", value="100", is_system=True))
 
     # Sync version from file system
     if os.path.exists("VERSION"):
@@ -136,19 +139,20 @@ def init_db(db: Session = None):
             if current_version:
                 version_setting = db.query(SystemSetting).filter(SystemSetting.name == "version").first()
                 if not version_setting:
-                    db.add(SystemSetting(name="version", value=current_version))
+                    db.add(SystemSetting(name="version", value=current_version, is_system=True))
                 elif version_setting.value != current_version:
                     version_setting.value = current_version
+                    version_setting.is_system = True
     
     # 2. Seed default roles
     admin_role = db.query(Role).filter(Role.name == "Admin").first()
     if not admin_role:
-        admin_role = Role(name="Admin", description="System Administrator with full access")
+        admin_role = Role(name="Admin", description="System Administrator with full access", is_system=True)
         db.add(admin_role)
         
     user_role = db.query(Role).filter(Role.name == "User").first()
     if not user_role:
-        user_role = Role(name="User", description="Standard user with limited access")
+        user_role = Role(name="User", description="Standard user with limited access", is_system=True)
         db.add(user_role)
     
     db.commit() # Commit roles so they have IDs
@@ -157,7 +161,7 @@ def init_db(db: Session = None):
     # Identify unique pages from database.py get_pages()
     pages_list = get_pages()
 
-    admin_menu_pages = ["/admin/roles", "/admin/permissions", "/admin/users", "/settings/system", "/admin/securities"]
+    admin_menu_pages = ["/admin/roles", "/admin/permissions", "/admin/users", "/settings/system", "/admin/securities", "/admin/settings/export", "/admin/settings/import"]
 
     # Clear old type-based permissions to avoid confusion during this migration
     db.query(Permission).filter(Permission.page_path == None).delete()
@@ -169,7 +173,7 @@ def init_db(db: Session = None):
             Permission.page_path == path
         ).first()
         if not existing_admin:
-            db.add(Permission(role_id=admin_role.id, page_path=path, page_type=pt, level=PermissionLevel.FULL))
+            db.add(Permission(role_id=admin_role.id, page_path=path, page_type=pt, level=PermissionLevel.FULL, is_system=True))
 
         # User Role: 
         # NONE for Admin menu pages, FULL for others
@@ -179,7 +183,7 @@ def init_db(db: Session = None):
         ).first()
         if not existing_user:
             level = PermissionLevel.NONE if path in admin_menu_pages else PermissionLevel.FULL
-            db.add(Permission(role_id=user_role.id, page_path=path, page_type=pt, level=level))
+            db.add(Permission(role_id=user_role.id, page_path=path, page_type=pt, level=level, is_system=True))
     
     db.commit()
     
@@ -236,6 +240,10 @@ def get_pages():
         ("/settings/user/change-password", PageType.SETTINGS, "link_change_password"),
         ("/settings/user/upload-photo", PageType.SETTINGS, "label_profile_photo"),
         ("/settings/system", PageType.SETTINGS, "item_system_settings"),
+        ("/settings/export", PageType.SETTINGS, "link_export_data"),
+        ("/settings/import", PageType.SETTINGS, "link_import_data"),
+        ("/admin/settings/export", PageType.SETTINGS, "link_system_export"),
+        ("/admin/settings/import", PageType.SETTINGS, "link_system_import"),
         ("/admin/users", PageType.MAINTENANCE, "item_users"),
         ("/admin/roles", PageType.MAINTENANCE, "item_roles"),
         ("/admin/securities", PageType.MAINTENANCE, "item_securities"),

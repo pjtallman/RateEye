@@ -1,4 +1,11 @@
 {
+  "export_import": {
+    "supports_user_data": true,
+    "supports_system_data": false,
+    "user_data_categories": [
+      {"id": "securities", "name": "include_securities", "label_key": "label_include_securities"}
+    ]
+  },
   "browse_panel": {
     "search_fields": [
       {"name": "symbol", "label_key": "th_symbol"},
