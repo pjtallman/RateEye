@@ -114,6 +114,11 @@ erDiagram
         string security_type
         string asset_class
         string current_price
+        string previous_close
+        string open_price
+        string nav
+        string range_52_week
+        string avg_volume
         string yield_30_day
         string yield_7_day
     }

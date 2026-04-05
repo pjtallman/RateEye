@@ -17,7 +17,7 @@ RateEye provides a robust, cross-platform installation script that automates pre
 
 ### Prerequisites:
 Ensure you have the following installed on your system:
-- **Python 3.12+**
+- **Python 3.14+**
 - **Node.js (v18+) & NPM**
 - **Git**
 
