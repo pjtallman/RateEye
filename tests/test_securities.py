@@ -1,5 +1,5 @@
 import pytest
-from database import Security, SecurityType, AssetClass, init_db
+from rateeye.database import Security, SecurityType, AssetClass, init_db
 
 def test_securities_list_basic(client, test_admin, db):
     init_db(db)
@@ -32,7 +32,7 @@ def test_maintenance_layout_elements(client, test_admin, db):
     assert 'class="browse-panel"' in resp.text
     assert 'class="maintenance-panel"' in resp.text
     assert 'class="advanced-search-panel"' in resp.text
-    assert 'class="action-panel"' in resp.text
+    assert 'class="button-bar-panel"' in resp.text
     assert 'class="maintenance-form"' in resp.text
     assert 'class="save-panel"' in resp.text
 

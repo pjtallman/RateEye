@@ -5,7 +5,7 @@ import random
 import logging
 import yfinance as yf
 from curl_cffi.requests import AsyncSession
-from database import SecurityType, AssetClass
+from ..database import SecurityType, AssetClass
 
 logger = logging.getLogger(__name__)
 

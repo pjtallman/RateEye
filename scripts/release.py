@@ -38,7 +38,7 @@ def get_open_milestones(repo_full_name):
 
 def main():
     parser = argparse.ArgumentParser(description="RateEye Release Automation (Architect Version)")
-    parser.add_argument("--version", required=True, help="Version to release (e.g., v1.0.4)")
+    parser.add_argument("--version", required=True, help="Version to release (e.g., v1.0.5)")
     args = parser.parse_args()
 
     repo_name = get_repo_full_name()
@@ -107,6 +107,10 @@ def main():
     run("git checkout main")
     run("git pull origin main")
     run(f"git branch -d {current_branch}", check=False)
+
+    # 3.5 Sync Version
+    print(f"[3.5/6] Synchronizing version from VERSION file...")
+    run(f"{sys.executable} scripts/sync_version.py")
 
     # 4. Build
     print(f"[4/6] Building distribution package...")

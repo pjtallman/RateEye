@@ -1,9 +1,9 @@
 import pytest
-from database import Permission, PermissionLevel, Role, User, PageType
+from rateeye.database import Permission, PermissionLevel, Role, User, PageType
 
 def test_seeding_defaults(db):
     # We want to test init_db seeding without locking the DB.
-    from database import init_db
+    from rateeye.database import init_db
     init_db(db)
     
     admin_role = db.query(Role).filter(Role.name == "Admin").first()
@@ -16,7 +16,7 @@ def test_seeding_defaults(db):
         assert p.level == PermissionLevel.FULL
 
     # Issue 4: User role gets NONE for admin menu pages, FULL for others
-    admin_menu_pages = ["/admin/roles", "/admin/permissions", "/admin/users", "/settings/system"]
+    admin_menu_pages = ["/admin/roles", "/admin/permissions", "/admin/users", "/settings/system", "/admin/securities", "/admin/settings/export", "/admin/settings/import"]
     user_perms = db.query(Permission).filter(Permission.role_id == user_role.id).all()
     for p in user_perms:
         if p.page_path in admin_menu_pages:

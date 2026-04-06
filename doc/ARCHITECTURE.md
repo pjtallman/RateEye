@@ -1,66 +1,103 @@
 # RateEye Technical Architecture & Design
 
 ## 1. Executive Summary
-RateEye is a high-performance yield tracking and security maintenance application built with a modern, layered architecture. It provides real-time security data lookups, bulk operations, and localized administrative controls. The system is designed for extensibility, allowing for easy integration of new security data providers and administrative activities.
+RateEye is a high-performance yield tracking and security maintenance application built with a modern, layered architecture. It provides real-time security data lookups, bulk operations, and localized administrative controls.
 
 ## 2. Technology Stack
 - **Backend:** [FastAPI](https://fastapi.tiangolo.com/) (Python 3.14+)
 - **Database:** [SQLite](https://sqlite.org/) with [SQLAlchemy](https://www.sqlalchemy.org/) ORM
-- **Frontend:** [Jinja2](https://palletsprojects.com/p/jinja/) Templates, [TypeScript](https://www.typescriptlang.org/) (ES6+), Vanilla CSS
+- **Frontend:** [Jinja2](https://palletsprojects.com/p/jinja/) Templates, [TypeScript](https://www.typescriptlang.org/) (ESNext), Vanilla CSS
 - **Data Fetching:** `yfinance`, `curl_cffi` (impersonation), and various REST APIs
 - **Tooling:** `npm` for TypeScript compilation, `pytest` for unit testing
 
-## 3. High-Level System Architecture
+## 3. Folder Structure (Best Practices)
+The project follows a standard "src layout" to ensure clear separation between source code, tests, and data.
 
-```mermaid
-graph TD
-    subgraph Browser_Layer [Client Layer]
-        UI[Jinja2 HTML Templates]
-        TS[TypeScript Managers]
-        CSS[Vanilla CSS Grid/Flexbox]
-    end
-
-    subgraph API_Layer [Application Layer]
-        FastAPI[FastAPI App]
-        Router[Dynamic Routing / Page Permissions]
-        EndpointFactory[Security Endpoint Factory]
-    end
-
-    subgraph Data_Layer [Data & Integration Layer]
-        DB[(SQLite / SQLAlchemy)]
-        Yahoo[Yahoo Scraper Endpoint]
-        Finnhub[Finnhub API Endpoint]
-        AV[Alpha Vantage Endpoint]
-    end
-
-    UI --> Router
-    TS -- AJAX/Fetch --> Router
-    Router --> DB
-    Router --> EndpointFactory
-    EndpointFactory --> Yahoo
-    EndpointFactory --> Finnhub
-    EndpointFactory --> AV
+```
+/
+├── .gitignore              # Git ignore rules (node_modules, data, etc. are excluded)
+├── README.md               # Basic project info and quick start
+├── VERSION                 # Current application version
+├── package.json            # Node.js dependencies and build scripts
+├── tsconfig.json           # TypeScript configuration
+├── pyproject.toml          # Python project configuration
+├── pytest.ini              # Test configuration
+├── requirements.txt        # Python dependencies
+├── install.py              # Automated installation and deployment script
+├── data/                   # Persistent storage (SQLite .db files)
+├── doc/                    # Technical documentation
+├── scripts/                # Dev/Ops automation scripts (release, milestone)
+├── src/                    # Source code root
+│   ├── frontend/           # TypeScript source files
+│   └── rateeye/            # Main Python package
+│       ├── main.py         # Application entry point and API routes
+│       ├── database.py     # Data models and session management
+│       ├── i18n.py         # Internationalization logic
+│       ├── locales/        # Translation JSON files
+│       ├── metadata/       # Activity-specific UI metadata
+│       ├── static/         # Compiled JS, CSS, and uploaded assets
+│       └── templates/      # HTML templates (Jinja2)
+└── tests/                  # Unit and integration tests
 ```
 
 ## 4. Component Architecture
 
 ### 4.1. Maintenance Activity Pattern
-All administrative pages (Securities, Users, Roles, Permissions) follow a standardized "Maintenance Activity" architectural pattern.
-
-- **Base Template (`maintenance_activity_base.html`):** Defines a two-vertical-panel layout.
-    - **Browse Panel (BP):** Searchable table for record selection.
-    - **Maintenance Panel (MP):** Form for record viewing and editing.
-- **Base Manager (`maintenance_activity.ts`):** An abstract TypeScript class handling common UI lifecycle events (Selection, Dirty Checking, Save/Delete AJAX, State Management).
-- **Title Panel (TP):** Contains the Page Title and a standardized **Button Bar Panel (BBP)** for CRUD and Bulk actions.
+Administrative pages follow a standardized pattern for consistency and rapid development.
+- **`maintenance_activity_base.html`:** Implements a two-vertical-panel layout (Browse vs. Maintenance).
+- **`MaintenanceActivityManager` (TS):** Base class for handling CRUD lifecycle events via AJAX.
+- **Title Panel (TP):** Split into a Label Panel (LP) and a Button Bar Panel (BBP) for centralized actions.
 
 ### 4.2. Security Data Provider Strategy
-The application uses the **Strategy Pattern** to handle different security data sources.
+...
+## 6. Scalability & Distributed Architecture
 
-- **`BaseSecurityEndpoint`:** Abstract base class defining `search` and `lookup` interfaces.
-- **`YahooScraperEndpoint`:** Default provider using `curl_cffi` for browser impersonation and `yfinance` for data mapping. Includes virtual fallback for missing tickers.
-- **`FinnhubEndpoint` / `AlphaVantageEndpoint`:** API-key based providers for high-reliability data.
+While RateEye is designed as a streamlined monolith, it follows cloud-native principles that allow it to scale from a single-node local setup to a distributed, high-availability environment.
 
-## 5. Data Model
+### 6.1. Component Decoupling
+The application is structured to allow independent scaling of its primary layers:
+
+- **Frontend (Static Assets):** All TypeScript assets are compiled into standard JavaScript and CSS. In a scaled environment, these can be offloaded from the FastAPI server and served via Nginx, an AWS S3 bucket, or a global Content Delivery Network (CDN) like CloudFront.
+- **Backend (API Service):** The FastAPI application is stateless (session state is currently handled via signed cookies/`SECRET_KEY`). Multiple instances can be run behind a Load Balancer (e.g., Nginx, HAProxy, AWS ALB).
+- **Database (Persistence):** By default, RateEye uses SQLite for simplicity. For scaling, the `DATABASE_URL` environment variable can be pointed to a client-server database like **PostgreSQL** or **MySQL** hosted on a separate, dedicated server or a managed service (e.g., AWS RDS).
+
+### 6.2. Scaling Strategies
+
+| Strategy | Local/Small (Default) | Distributed/Production |
+| :--- | :--- | :--- |
+| **Compute** | Single `uvicorn` process | Multiple containers (Docker/K8s) |
+| **Database** | SQLite (`data/rateeye.db`) | PostgreSQL / RDS |
+| **Storage** | Local `uploads/` folder | Shared Volume (EFS) or Object Storage (S3) |
+| **Networking** | Direct Access (Port 8000) | Reverse Proxy (Nginx) + SSL |
+
+### 6.3. Environment Variables
+Scaling is managed primarily through environment configuration:
+- `DATABASE_URL`: Connection string (e.g., `postgresql://user:pass@db-host:5432/rateeye`).
+- `SECRET_KEY`: Must be identical across all backend nodes to allow consistent session validation.
+- `PYTHONPATH`: Should include the `src` directory.
+
+## 7. Data Model & Segregation
+
+### 7.1. System vs. User Data
+RateEye distinguishes between **System Data** (distributed with the application) and **User Data** (created and maintained by the end-user).
+
+- **System Data (`is_system=True`):**
+    - **Default Roles:** `Admin` and `User` roles.
+    - **Initial Permissions:** Standardized access control for all application pages.
+    - **Core Settings:** Baseline configurations like `log_lines` and `version`.
+    - *Purpose:* Provides the foundational environment required for the application to function. System data is typically protected from deletion to ensure system stability.
+
+- **User Data (`is_system=False`):**
+    - **Users:** Account information for all registered users.
+    - **User Settings:** Personalizations like profile photos and language preferences.
+    - **Securities:** The master list of tickers, names, and yields managed by the user.
+    - **Custom Roles/Permissions:** Any additional access control entities defined by an administrator.
+    - *Purpose:* Holds the personalized data and configuration that makes the application useful for a specific user or organization.
+
+### 7.2. Persistence
+All data is persisted in a local **SQLite** database file (`data/rateeye.db`).
+- **Backup/Restore:** Users can use the built-in Export/Import functionality to migrate their data.
+- **Relational Integrity:** Foreign key constraints ensure that deleting a user or role correctly handles associated permissions and settings.
 
 ```mermaid
 erDiagram
@@ -68,44 +105,61 @@ erDiagram
     User }|..|{ Role : belongs_to
     Role ||--o{ Permission : grants
     User ||--o{ Permission : has_custom
-    Security ||--o{ Security : managed_as
+    Security ||--o{ Security : managed_by_user
     SystemSetting ||--o| App : configures
 
     User {
         int id PK
         string email UK
+        string username UK
         string hashed_password
         bool is_authorized
+        bool force_password_change
+        string provider
+        string photo_url
+    }
+    Role {
+        int id PK
+        string name UK
+        string description
+        bool is_system
+    }
+    Permission {
+        int id PK
+        string page_path
+        string page_type
+        int role_id FK
+        int user_id FK
+        string level
+        bool is_system
     }
     Security {
         int id PK
         string symbol UK
         string name
-        enum security_type
-        enum asset_class
+        string security_type
+        string asset_class
         string current_price
+        string previous_close
+        string open_price
+        string nav
+        string range_52_week
+        string avg_volume
+        string yield_30_day
+        string yield_7_day
     }
-    Permission {
+    SystemSetting {
+        string name PK
+        string value
+        bool is_system
+    }
+    UserSetting {
         int id PK
-        string page_path
-        enum level
+        int user_id FK
+        string name
+        string value
     }
 ```
-
-## 6. Key Design Standards
-
-### 6.1. UI/UX Principles
-- **Full-Width Layout:** Content expands to fill the browser window.
-- **Responsive Panels:** Browse Panel (1/3) and Maintenance Panel (2/3) support internal scrolling.
-- **Status & Error Panel (SEP):** Dedicated area at the bottom for AJAX feedback and validation errors (max 25% height).
-- **Help Indicators:** Standardized `?` SVG icons positioned to the right of labels, opening instructional modals.
-
-### 6.2. Security & Permissions
-- **Granular RBAC:** Access is controlled via path-based permissions stored in the database.
-- **Sub-path Inheritance:** APIs (e.g., `/search`) automatically inherit permissions from their parent maintenance pages.
-- **Impersonation Prevention:** Backend scrapers use `curl_cffi` to mimic standard browser signatures to avoid anti-bot blocks.
-
-## 7. Operational Design
-- **Localization:** All UI strings are managed in `translations.json` (English and Spanish supported).
-- **Logging:** Centralized rotating file log (`logs/RateEye.log`) with adjustable verbosity in System Settings.
-- **Deployment:** TypeScript assets must be compiled via `npm run build` before restarting the FastAPI backend.
+- **Granular RBAC:** Permissions are tied to page paths and roles/users.
+- **Sub-path Inheritance:** APIs automatically inherit permissions from their parent pages.
+- **AJAX Validation:** All destructive or modifying actions are validated on the backend.

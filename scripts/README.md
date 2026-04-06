@@ -22,11 +22,18 @@ The `start_milestone.py` script automates the creation of a GitHub Milestone, a 
    - Update the `description`.
    - List all `issues` with their respective `title` and `body`.
 2. **Update `VERSION`:**
-   - Update the root `VERSION` file to the target version for this milestone (e.g., `1.0.4_dev`).
+   - Update the root `VERSION` file to the target version for this milestone (e.g., `1.0.5_dev`).
 3. **Run the script:**
    ```bash
-   python scripts/start_milestone.py
+   # On Mac/Linux:
+   export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+   .venv/bin/python scripts/start_milestone.py
+
+   # On Windows:
+   $env:PYTHONPATH += ";$(Get-Location)\src"
+   .venv\Scripts\python scripts/start_milestone.py
    ```
+
 4. **Action:** Follow the prompts to confirm the initialization.
 
 ---
@@ -39,9 +46,16 @@ The `release.py` script automates the final steps of a milestone: creating a Pul
 1. **Ensure you are on your milestone branch.**
 2. **Run the script:**
    ```bash
-   python scripts/release.py --version v1.0.4
+   # On Mac/Linux:
+   export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+   .venv/bin/python scripts/release.py --version v1.0.5
+
+   # On Windows:
+   $env:PYTHONPATH += ";$(Get-Location)\src"
+   .venv\Scripts\python scripts/release.py --version v1.0.5
    ```
-   *(Replace `v1.0.4` with your target release tag)*.
+
+   *(Replace `v1.0.5` with your target release tag)*.
 3. **Action:**
    - The script will show a "Plan of Action".
    - Confirm with `y` to execute.

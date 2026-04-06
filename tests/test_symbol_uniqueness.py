@@ -1,5 +1,5 @@
 import pytest
-from database import Security, SecurityType, init_db
+from rateeye.database import Security, SecurityType, init_db
 
 def test_duplicate_symbol_prevention(client, test_admin, db):
     init_db(db)

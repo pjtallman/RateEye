@@ -1,8 +1,8 @@
 import pytest
-from database import User, Role, pwd_context
+from rateeye.database import User, Role, pwd_context
 
 def test_user_settings_page(client, test_user, db):
-    from database import init_db
+    from rateeye.database import init_db
     init_db(db)
     # Log in
     client.post(
@@ -16,7 +16,7 @@ def test_user_settings_page(client, test_user, db):
     assert "test@example.com" in response.text
 
 def test_change_username_success(client, test_user, db):
-    from database import init_db
+    from rateeye.database import init_db
     init_db(db)
     # Log in
     client.post(
@@ -38,7 +38,7 @@ def test_change_username_success(client, test_user, db):
     assert test_user.username == "updatedusername"
 
 def test_change_username_taken(client, test_user, db):
-    from database import init_db
+    from rateeye.database import init_db
     init_db(db)
     # Create another user
     db.add(User(username="otheruser", email="other@example.com", hashed_password="hashed"))
@@ -60,7 +60,7 @@ def test_change_username_taken(client, test_user, db):
     assert "Username already taken" in response.text
 
 def test_admin_list_users(client, test_admin, db):
-    from database import init_db
+    from rateeye.database import init_db
     init_db(db)
     # Log in as admin
     client.post(
@@ -74,7 +74,7 @@ def test_admin_list_users(client, test_admin, db):
     assert "adminuser" in response.text
 
 def test_admin_force_password_change(client, test_admin, test_user, db):
-    from database import init_db
+    from rateeye.database import init_db
     init_db(db)
     # Log in as admin
     client.post(
@@ -94,7 +94,7 @@ def test_admin_force_password_change(client, test_admin, test_user, db):
     assert test_user.force_password_change is True
 
 def test_admin_delete_user(client, test_admin, test_user, db):
-    from database import init_db
+    from rateeye.database import init_db
     init_db(db)
     # Log in as admin
     client.post(
@@ -115,7 +115,7 @@ def test_admin_delete_user(client, test_admin, test_user, db):
     assert deleted_user is None
 
 def test_admin_update_user(client, test_admin, test_user, db):
-    from database import init_db
+    from rateeye.database import init_db
     init_db(db)
     # Log in as admin
     client.post(
@@ -137,7 +137,7 @@ def test_admin_update_user(client, test_admin, test_user, db):
     assert test_user.force_password_change is True
 
 def test_admin_update_user_email_taken(client, test_admin, test_user, db):
-    from database import init_db
+    from rateeye.database import init_db
     init_db(db)
     # Create another user to take an email
     other_user = User(username="other", email="taken@example.com", hashed_password="hashed")
@@ -160,7 +160,7 @@ def test_admin_update_user_email_taken(client, test_admin, test_user, db):
     assert test_user.email == original_email
 
 def test_admin_update_non_existent_user(client, test_admin, db):
-    from database import init_db
+    from rateeye.database import init_db
     init_db(db)
     client.post("/login", data={"email": "admin@example.com", "password": "adminpassword"})
     
@@ -173,7 +173,7 @@ def test_admin_update_non_existent_user(client, test_admin, db):
     assert response.status_code == 200 # Redirects back to list
 
 def test_admin_delete_self_fails(client, test_admin, db):
-    from database import init_db
+    from rateeye.database import init_db
     init_db(db)
     # Log in as admin
     client.post(
@@ -190,7 +190,7 @@ def test_admin_delete_self_fails(client, test_admin, db):
     assert "Cannot delete yourself" in response.text
 
 def test_admin_create_user(client, test_admin, db):
-    from database import init_db
+    from rateeye.database import init_db
     init_db(db)
 
     client.post(
@@ -216,11 +216,11 @@ def test_admin_create_user(client, test_admin, db):
     assert user_role in new_user.roles
 
     # Verify initial password is username
-    from main import verify_password
+    from rateeye.main import verify_password
     assert verify_password("newuser", new_user.hashed_password)
 
 def test_login_username_success(client, test_user, db):
-    from database import init_db
+    from rateeye.database import init_db
     init_db(db)
     
     # test_user.username is "testuser", password is "testpassword"

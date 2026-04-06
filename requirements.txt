@@ -13,3 +13,6 @@ pytest-asyncio
 beautifulsoup4
 yfinance
 curl_cffi
+PyYAML
+psycopg2-binary
+pymysql

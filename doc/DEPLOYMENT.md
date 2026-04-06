@@ -1,113 +1,225 @@
 # RateEye Deployment & Installation Guide
 
+This document provides detailed instructions for deploying RateEye in different environments, ranging from local development setups to professional production distributions.
+
 ## 1. Deployment Model Overview
-RateEye utilizes a **Monolithic Self-Hosted Model**. The application is designed to run as a single process that serves both the FastAPI backend and the static frontend assets.
+RateEye is a monolithic application serving a **FastAPI** backend and a **TypeScript/Vanilla CSS** frontend.
 
-### Key Architectural Components:
-- **Application Server:** FastAPI (Uvicorn) handles all HTTP requests and API endpoints.
-- **Database:** A local SQLite file (`rateeye.db`) is used for persistent storage, requiring no external database server configuration for standard deployments.
-- **Frontend:** TypeScript files are pre-compiled into JavaScript and served as static files by the FastAPI application.
-- **Dependency Management:** Python dependencies are managed via `uv` or `pip`, and frontend dependencies via `npm`.
-
----
-
-## 2. System Prerequisites
-Before installation, ensure the target machine has the following installed:
-- **Python 3.12 or newer**
-- **Node.js (v18+) and NPM**
-- **Git** (for cloning the repository)
-- **uv** (Recommended for Python package management)
+### Key Components:
+- **Backend:** Python 3.14+ utilizing FastAPI and SQLAlchemy.
+- **Frontend:** TypeScript assets compiled into static JavaScript.
+- **Database:** SQLite (default) for single-node simplicity.
+- **Build System:** `Hatchling` for production-ready packaging and environment management.
 
 ---
 
-## 3. Installation Instructions: Mac OS
+## 2. Prerequisites
+Regardless of the deployment method, ensure the following are installed:
+- **Python 3.14+**
+- **Node.js (v18+) & NPM** (Required for frontend compilation)
+- **Git**
+- **uv** (Recommended) or **pip** & **build** module
 
-### Step 1: Clone the Repository
-Open **Terminal** and run:
+---
+
+## 3. Method A: Local & Internal Server Deployment (`install.py`)
+
+This method is ideal for development environments, internal testing servers, or simple local hosting. It automates the entire setup from a git clone.
+
+### Detailed Steps:
+1.  **Clone the Repository:**
+    ```bash
+    git clone https://github.com/pjtallman/RateEye.git
+    cd RateEye
+    ```
+
+2.  **Execute the Installer:**
+    The unified `install.py` script detects your OS and performs all necessary configuration.
+    ```bash
+    # Mac/Linux:
+    python3 install.py
+
+    # Windows:
+    python install.py
+    ```
+
+3.  **Process Automation Details:**
+    The script performs the following sequential actions:
+    - **Validation:** Checks for Git, Node, and NPM.
+    - **Environment:** Creates a `.venv` folder and installs dependencies from `requirements.txt`.
+    - **Frontend:** Executes `npm install` and `npm run build`. TypeScript is compiled to `src/rateeye/static/js/`.
+    - **Testing:** Runs `pytest` with `PYTHONPATH` correctly set to the `src` directory.
+    - **Database:** Initializes `rateeye.db` with default settings and roles.
+    - **Launch:** Starts the server on `0.0.0.0:8000` to allow access from outside the server.
+
+4.  **Verification:**
+    Navigate to `http://<server-ip>:8000`. Detailed installation logs are available at `logs/install.log`.
+
+---
+
+## 4. Method B: Professional Production Build (`Hatchling`)
+
+This is the standard for production deployment. It creates a clean **Source Distribution (sdist)** or **Wheel** that contains only the necessary code, explicitly excluding development artifacts like `scripts/`, `tests/`, and `milestone_tasks.yaml`.
+
+### Step 1: Prepare the Frontend
+Production builds should contain pre-compiled assets.
 ```bash
-git clone https://github.com/pjtallman/RateEye.git
-cd RateEye
+npm install
+npm run build
 ```
 
-### Step 2: Set Up Python Environment
-We recommend using `uv` for speed, but standard `venv` works as well.
-**Using uv (Recommended):**
+### Step 2: Build the Package
+Use `uv` (recommended) or the standard Python `build` tool to generate the distribution files.
 ```bash
-uv venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
+# Using uv (fastest):
+uv build
+
+# OR using standard python build:
+python3 -m pip install build
+python3 -m build
 ```
-**Using standard venv:**
+
+### Step 3: Distribution Analysis
+The build process generates a `dist/` folder containing:
+- `rateeye-1.0.5.tar.gz` (Source Distribution)
+- `rateeye-1.0.5-py3-none-any.whl` (Binary Wheel)
+
+**Exclusion Verification:** Because we use `Hatchling` with the configurations in `pyproject.toml`, the following items are **excluded** from these files:
+- `scripts/` folder (Release and Milestone scripts)
+- `tests/` folder
+- `milestone_tasks.yaml`
+- `.pytest_cache/` and `__pycache__`
+
+### Step 4: Install on Production Server
+Copy the `.whl` or `.tar.gz` file to your production server and install it into a clean environment.
 ```bash
+# Create and activate environment
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+
+# Install the built wheel
+pip install rateeye-1.0.5-py3-none-any.whl
 ```
 
-### Step 3: Build the Frontend
-Install Node dependencies and compile the TypeScript assets:
+### Step 5: Run in Production
+In a production environment, use `uvicorn` directly or a process manager like `systemd`.
 ```bash
-npm install
-npm run build
-```
+# Set production variables
+export SECRET_KEY="your-secure-random-key"
+export DATABASE_URL="sqlite:///./data/production.db"
 
-### Step 4: Launch the Application
-```bash
-python3 main.py
+# Start the server
+uvicorn rateeye.main:app --host 0.0.0.0 --port 8000
 ```
-The application will be available at `http://localhost:8000`.
 
 ---
 
-## 4. Installation Instructions: Windows
+## 5. Production Hardening
 
-### Step 1: Clone the Repository
-Open **PowerShell** or **Command Prompt** and run:
-```powershell
-git clone https://github.com/pjtallman/RateEye.git
-cd RateEye
-```
+### 1. Reverse Proxy (Nginx)
+Never expose Uvicorn directly to the internet. Use Nginx as a reverse proxy to handle SSL (HTTPS) and static file caching.
 
-### Step 2: Set Up Python Environment
-**Using uv (Recommended):**
-```powershell
-uv venv
-.venv\Scripts\activate
-uv pip install -r requirements.txt
-```
-**Using standard venv:**
-```powershell
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-```
+### 2. Service Management (Systemd)
+Create a service file at `/etc/systemd/system/rateeye.service`:
+```ini
+[Unit]
+Description=RateEye Yield Tracker
+After=network.target
 
-### Step 3: Build the Frontend
-```powershell
-npm install
-npm run build
-```
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/rateeye
+Environment="PATH=/opt/rateeye/.venv/bin"
+Environment="DATABASE_URL=sqlite:///./data/rateeye.db"
+ExecStart=/opt/rateeye/.venv/bin/uvicorn rateeye.main:app --host 0.0.0.0 --port 8000
 
-### Step 4: Launch the Application
-```powershell
-python main.py
+[Install]
+WantedBy=multi-user.target
 ```
-The application will be available at `http://localhost:8000`.
 
 ---
 
-## 5. Deployment Configuration (Production)
+---
 
-### Environment Variables
-By default, RateEye uses a local SQLite database. You can override this using the `DATABASE_URL` environment variable:
-- **Unix:** `export DATABASE_URL="sqlite:///./prod.db"`
-- **Windows:** `$env:DATABASE_URL="sqlite:///./prod.db"`
+## 7. Method C: Distributed & High Availability Deployment
 
-### Security Considerations
-- **HTTPS:** In a production environment, it is highly recommended to run RateEye behind a reverse proxy like **Nginx** or **Apache** to handle SSL/TLS termination.
-- **Port Mapping:** The default port is `8000`. Ensure your firewall allows traffic on this port or configure the proxy to forward requests to it.
+For large-scale or production-critical environments, RateEye can be deployed in a distributed manner. This allows you to host the database on a separate server and run multiple instances of the RateEye application behind a load balancer.
 
-## 6. Troubleshooting
-- **Missing Modules:** If you see `ModuleNotFoundError`, ensure your virtual environment is active (`source .venv/bin/activate` or `.venv\Scripts\activate`).
-- **JavaScript Errors:** If the UI doesn't load correctly, ensure `npm run build` completed without errors and check that the `static/js/` directory contains compiled `.js` files.
-- **Database Locked:** If multiple processes try to write to SQLite simultaneously, you may see a "Database is locked" error. Ensure only one instance of `main.py` is running.
+### 1. Separate Database Server
+Instead of the default SQLite file, connect to a robust database like PostgreSQL:
+1.  **Set Up PostgreSQL:** Install and configure PostgreSQL on a dedicated server. Create a database named `rateeye`.
+2.  **Configure `DATABASE_URL`:** On each RateEye app server, set the environment variable:
+    ```bash
+    export DATABASE_URL="postgresql://username:password@db-server-ip:5432/rateeye"
+    ```
+3.  **Drivers:** Ensure you install the appropriate database driver (e.g., `pip install psycopg2-binary`).
+
+### 2. High Availability (Horizontal Scaling)
+Deploy multiple application nodes to handle high traffic and provide redundancy:
+- **Shared Session Key:** All nodes **must** share the same `SECRET_KEY` so that session cookies can be validated by any node.
+- **Shared Storage:** If using profile photo uploads, the `src/rateeye/static/uploads` directory should be mounted on a shared network drive (e.g., NFS, AWS EFS).
+- **Load Balancing:** Use Nginx or an AWS Application Load Balancer (ALB) to distribute traffic across your nodes.
+
+### 3. Containerization (Docker)
+RateEye is fully container-ready. Use the provided `Dockerfile` to build an image:
+```bash
+# Build the image
+docker build -t rateeye:latest .
+
+# Run with an external database
+docker run -d \
+  -p 8000:8000 \
+  -e DATABASE_URL="postgresql://user:pass@db-host/rateeye" \
+  -e SECRET_KEY="your-prod-secret" \
+  rateeye:latest
+```
+
+---
+
+## 8. Method D: Containerized Deployment (Docker Compose & Nginx)
+
+For a professional-grade, easy-to-manage production environment, we use **Docker Compose** to orchestrate the FastAPI application and an **Nginx** reverse proxy.
+
+### Why use Nginx?
+- **SSL/TLS Termination:** Easily add HTTPS (e.g., via Let's Encrypt).
+- **Security:** Adds essential security headers (HSTS, CSP, etc.).
+- **Performance:** Serves static JS and CSS files much faster than Python.
+- **Buffering:** Protects the FastAPI application from slow or malicious clients.
+
+### Step 1: Prepare the environment
+Ensure your local `src/rateeye/static/js` is built if you're not using the Docker multi-stage build directly.
+```bash
+npm run build
+```
+
+### Step 2: Configure Docker Compose
+Review the `docker-compose.yml` file. It sets up two services:
+1.  **`app`:** The FastAPI application running Uvicorn.
+2.  **`nginx`:** The reverse proxy listening on port 80.
+
+### Step 3: Run the stack
+```bash
+docker-compose up -d --build
+```
+The application will now be accessible at `http://localhost`.
+
+---
+
+## 9. Nginx Configuration Best Practices
+
+Our `nginx/nginx.conf` is optimized for:
+- **Gzip Compression:** Reduces the size of transmitted files (JSON, JS, CSS).
+- **Cache Control:** Sets long-lived cache headers for static assets.
+- **Security Headers:**
+    - `X-Frame-Options: SAMEORIGIN`: Prevents clickjacking.
+    - `X-Content-Type-Options: nosniff`: Prevents MIME-sniffing.
+    - `Content-Security-Policy`: Restricts where assets can be loaded from.
+
+---
+
+## 10. Troubleshooting
+- **Build Failures:** Ensure `npm run build` is successful before running `uv build`. Hatchling will package whatever is in the `static/js` folder.
+- **Missing Dependencies:** If running via `uvicorn` directly, ensure all dependencies listed in `pyproject.toml` were installed during the `pip install <wheel>` step.
+- **Permission Errors:** Ensure the user running the application has write access to the `data/` and `logs/` directories.
+- **Nginx Gateway Timeout:** If the `app` container is still starting, Nginx might return a 502 or 504. Wait a few seconds and refresh.

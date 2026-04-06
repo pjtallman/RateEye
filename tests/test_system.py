@@ -1,12 +1,12 @@
 import pytest
 import os
-from database import SystemSetting, get_system_setting
+from rateeye.database import SystemSetting, get_system_setting
 
-def test_system_settings_page(client, test_user):
+def test_system_settings_page(client, test_admin):
     # Log in
     client.post(
         "/login",
-        data={"email": "test@example.com", "password": "testpassword"}
+        data={"email": test_admin.email, "password": "adminpassword"}
     )
     
     response = client.get("/settings/system")
@@ -14,11 +14,11 @@ def test_system_settings_page(client, test_user):
     assert "system_settings.html" in response.template.name
     assert "100" in response.text
 
-def test_save_system_settings(client, test_user, db):
+def test_save_system_settings(client, test_admin, db):
     # Log in
     client.post(
         "/login",
-        data={"email": "test@example.com", "password": "testpassword"}
+        data={"email": test_admin.email, "password": "adminpassword"}
     )
     
     # Save settings
@@ -33,11 +33,11 @@ def test_save_system_settings(client, test_user, db):
     setting = db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first()
     assert setting.value == "250"
 
-def test_show_log(client, test_user):
+def test_show_log(client, test_admin):
     # Log in
     client.post(
         "/login",
-        data={"email": "test@example.com", "password": "testpassword"}
+        data={"email": test_admin.email, "password": "adminpassword"}
     )
     
     # Create a dummy log file if it doesn't exist
