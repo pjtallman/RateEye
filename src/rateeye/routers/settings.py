@@ -4,7 +4,7 @@ import logging
 import shutil
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Request, Form, Header, Depends, File, UploadFile
+from fastapi import APIRouter, Request, Form, Header, Depends, File, UploadFile, Response, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from fastapi.templating import Jinja2Templates
@@ -140,11 +140,23 @@ async def user_change_password(request: Request, current_password: str = Form(..
     user.hashed_password = get_password_hash(new_password); db.commit()
     return RedirectResponse(url="/settings/user", status_code=303)
 
+@router.get("/user/photo/{user_id}")
+async def get_user_photo(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.photo_blob:
+        # Check if we have a static fallback or just 404
+        raise HTTPException(status_code=404)
+    return Response(content=user.photo_blob, media_type=user.photo_mime_type or "image/jpeg")
+
 @router.post("/user/upload-photo")
 async def upload_photo(file: UploadFile = File(...), user: User = Depends(login_required), db: Session = Depends(get_db)):
     if not file.content_type.startswith("image/"): raise HTTPException(status_code=400, detail="Not an image")
-    ext = os.path.splitext(file.filename)[1]
-    filepath = os.path.join(BASE_DIR, "static", "uploads", "profile_photos", f"user_{user.id}{ext}")
-    with open(filepath, "wb") as buffer: shutil.copyfileobj(file.file, buffer)
-    user.photo_url = f"/static/uploads/profile_photos/user_{user.id}{ext}"; db.commit()
+    
+    # Save to BLOB
+    content = await file.read()
+    user.photo_blob = content
+    user.photo_mime_type = file.content_type
+    user.photo_url = f"/settings/user/photo/{user.id}"
+    db.commit()
+    
     return RedirectResponse(url="/settings/user", status_code=303)

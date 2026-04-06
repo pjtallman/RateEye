@@ -1,6 +1,6 @@
 import os
 from enum import Enum
-from sqlalchemy import create_engine, Column, String, Integer, Boolean, Text, ForeignKey, Table, Enum as SQLEnum
+from sqlalchemy import create_engine, Column, String, Integer, Boolean, Text, ForeignKey, Table, Enum as SQLEnum, LargeBinary
 from sqlalchemy.orm import sessionmaker, declarative_base, Session, relationship
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./data/rateeye.db")
@@ -121,6 +121,8 @@ class User(Base):
     provider = Column(String, default="local")
     profile_json = Column(Text, nullable=True)
     photo_url = Column(String, nullable=True)
+    photo_blob = Column(LargeBinary, nullable=True)
+    photo_mime_type = Column(String, nullable=True)
     
     settings = relationship("UserSetting", back_populates="user", cascade="all, delete-orphan")
     roles = relationship("Role", secondary=user_roles, back_populates="users")

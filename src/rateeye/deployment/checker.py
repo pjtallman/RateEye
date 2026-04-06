@@ -27,7 +27,6 @@ def check_environment():
         "src/rateeye/static", 
         "src/rateeye/templates", 
         "logs", 
-        "src/rateeye/static/uploads/profile_photos",
         "data"
     ]
     for directory in required_dirs:
