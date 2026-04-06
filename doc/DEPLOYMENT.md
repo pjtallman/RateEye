@@ -175,7 +175,51 @@ docker run -d \
   rateeye:latest
 ```
 
-## 8. Troubleshooting
+---
+
+## 8. Method D: Containerized Deployment (Docker Compose & Nginx)
+
+For a professional-grade, easy-to-manage production environment, we use **Docker Compose** to orchestrate the FastAPI application and an **Nginx** reverse proxy.
+
+### Why use Nginx?
+- **SSL/TLS Termination:** Easily add HTTPS (e.g., via Let's Encrypt).
+- **Security:** Adds essential security headers (HSTS, CSP, etc.).
+- **Performance:** Serves static JS and CSS files much faster than Python.
+- **Buffering:** Protects the FastAPI application from slow or malicious clients.
+
+### Step 1: Prepare the environment
+Ensure your local `src/rateeye/static/js` is built if you're not using the Docker multi-stage build directly.
+```bash
+npm run build
+```
+
+### Step 2: Configure Docker Compose
+Review the `docker-compose.yml` file. It sets up two services:
+1.  **`app`:** The FastAPI application running Uvicorn.
+2.  **`nginx`:** The reverse proxy listening on port 80.
+
+### Step 3: Run the stack
+```bash
+docker-compose up -d --build
+```
+The application will now be accessible at `http://localhost`.
+
+---
+
+## 9. Nginx Configuration Best Practices
+
+Our `nginx/nginx.conf` is optimized for:
+- **Gzip Compression:** Reduces the size of transmitted files (JSON, JS, CSS).
+- **Cache Control:** Sets long-lived cache headers for static assets.
+- **Security Headers:**
+    - `X-Frame-Options: SAMEORIGIN`: Prevents clickjacking.
+    - `X-Content-Type-Options: nosniff`: Prevents MIME-sniffing.
+    - `Content-Security-Policy`: Restricts where assets can be loaded from.
+
+---
+
+## 10. Troubleshooting
 - **Build Failures:** Ensure `npm run build` is successful before running `uv build`. Hatchling will package whatever is in the `static/js` folder.
 - **Missing Dependencies:** If running via `uvicorn` directly, ensure all dependencies listed in `pyproject.toml` were installed during the `pip install <wheel>` step.
 - **Permission Errors:** Ensure the user running the application has write access to the `data/` and `logs/` directories.
+- **Nginx Gateway Timeout:** If the `app` container is still starting, Nginx might return a 502 or 504. Wait a few seconds and refresh.
