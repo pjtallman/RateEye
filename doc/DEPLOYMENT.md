@@ -1,121 +1,181 @@
 # RateEye Deployment & Installation Guide
 
-## 1. Deployment Model Overview
-RateEye utilizes a **Monolithic Self-Hosted Model**. The application is designed to run as a single process that serves both the FastAPI backend and the static frontend assets.
+This document provides detailed instructions for deploying RateEye in different environments, ranging from local development setups to professional production distributions.
 
-### Key Architectural Components:
-- **Application Server:** FastAPI (Uvicorn) handles all HTTP requests and API endpoints.
-- **Database:** A local SQLite file (`rateeye.db`) is used for persistent storage.
-- **Frontend:** TypeScript files are compiled into JavaScript and served as static files.
-- **Automation:** A unified `install.py` script handles environment setup, builds, testing, and deployment.
+## 1. Deployment Model Overview
+RateEye is a monolithic application serving a **FastAPI** backend and a **TypeScript/Vanilla CSS** frontend.
+
+### Key Components:
+- **Backend:** Python 3.14+ utilizing FastAPI and SQLAlchemy.
+- **Frontend:** TypeScript assets compiled into static JavaScript.
+- **Database:** SQLite (default) for single-node simplicity.
+- **Build System:** `Hatchling` for production-ready packaging and environment management.
 
 ---
 
-## 2. Automated Installation (Recommended)
-
-RateEye provides a robust, cross-platform installation script that automates prerequisite validation, environment setup, frontend building, and unit testing.
-
-### Prerequisites:
-Ensure you have the following installed on your system:
+## 2. Prerequisites
+Regardless of the deployment method, ensure the following are installed:
 - **Python 3.14+**
-- **Node.js (v18+) & NPM**
+- **Node.js (v18+) & NPM** (Required for frontend compilation)
 - **Git**
+- **uv** (Recommended) or **pip** & **build** module
 
-### Execution:
+---
+
+## 3. Method A: Local & Internal Server Deployment (`install.py`)
+
+This method is ideal for development environments, internal testing servers, or simple local hosting. It automates the entire setup from a git clone.
+
+### Detailed Steps:
 1.  **Clone the Repository:**
     ```bash
     git clone https://github.com/pjtallman/RateEye.git
     cd RateEye
     ```
-2.  **Run the Installer:**
+
+2.  **Execute the Installer:**
+    The unified `install.py` script detects your OS and performs all necessary configuration.
     ```bash
-    # On Mac/Linux:
+    # Mac/Linux:
     python3 install.py
-    
-    # On Windows:
+
+    # Windows:
     python install.py
     ```
 
-### What the Installer Does:
-1.  **Detects OS:** Configures paths for Mac, Windows, or Linux.
-2.  **Validates Prerequisites:** Ensures Git, Node, and NPM are in your PATH.
-3.  **Environment Setup:** Creates a virtual environment (`.venv`) and installs all dependencies from `requirements.txt`.
-4.  **Frontend Build:** Runs `npm install` and `npm run build` to compile TypeScript assets.
-5.  **Validation:** Runs the full suite of **Unit Tests**. 
-    *   *Note: If tests fail, the application will not launch, and errors will be reported.*
-6.  **Launch:** Starts the FastAPI server at `http://localhost:8000`.
-7.  **Logging:** Detailed logs of the entire process are saved to `logs/install.log`.
+3.  **Process Automation Details:**
+    The script performs the following sequential actions:
+    - **Validation:** Checks for Git, Node, and NPM.
+    - **Environment:** Creates a `.venv` folder and installs dependencies from `requirements.txt`.
+    - **Frontend:** Executes `npm install` and `npm run build`. TypeScript is compiled to `src/rateeye/static/js/`.
+    - **Testing:** Runs `pytest` with `PYTHONPATH` correctly set to the `src` directory.
+    - **Database:** Initializes `rateeye.db` with default settings and roles.
+    - **Launch:** Starts the server on `0.0.0.0:8000` to allow access from outside the server.
+
+4.  **Verification:**
+    Navigate to `http://<server-ip>:8000`. Detailed installation logs are available at `logs/install.log`.
 
 ---
 
-## 3. Manual Installation: Mac OS
+## 4. Method B: Professional Production Build (`Hatchling`)
 
-If you prefer to perform steps manually:
+This is the standard for production deployment. It creates a clean **Source Distribution (sdist)** or **Wheel** that contains only the necessary code, explicitly excluding development artifacts like `scripts/`, `tests/`, and `milestone_tasks.yaml`.
 
-1.  **Environment Setup:**
-    ```bash
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip install -r requirements.txt
-    ```
-2.  **Build Frontend:**
-    ```bash
-    npm install
-    npm run build
-    ```
-3. **Run Tests:**
-    ```bash
-    export PYTHONPATH=$PYTHONPATH:$(pwd)/src
-    pytest
-    ```
-4. **Launch:**
-    ```bash
-    export PYTHONPATH=$PYTHONPATH:$(pwd)/src
-    python3 -m rateeye.main
-    ```
+### Step 1: Prepare the Frontend
+Production builds should contain pre-compiled assets.
+```bash
+npm install
+npm run build
+```
 
+### Step 2: Build the Package
+Use `uv` (recommended) or the standard Python `build` tool to generate the distribution files.
+```bash
+# Using uv (fastest):
+uv build
+
+# OR using standard python build:
+python3 -m pip install build
+python3 -m build
+```
+
+### Step 3: Distribution Analysis
+The build process generates a `dist/` folder containing:
+- `rateeye-1.0.5.tar.gz` (Source Distribution)
+- `rateeye-1.0.5-py3-none-any.whl` (Binary Wheel)
+
+**Exclusion Verification:** Because we use `Hatchling` with the configurations in `pyproject.toml`, the following items are **excluded** from these files:
+- `scripts/` folder (Release and Milestone scripts)
+- `tests/` folder
+- `milestone_tasks.yaml`
+- `.pytest_cache/` and `__pycache__`
+
+### Step 4: Install on Production Server
+Copy the `.whl` or `.tar.gz` file to your production server and install it into a clean environment.
+```bash
+# Create and activate environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install the built wheel
+pip install rateeye-1.0.5-py3-none-any.whl
+```
+
+### Step 5: Run in Production
+In a production environment, use `uvicorn` directly or a process manager like `systemd`.
+```bash
+# Set production variables
+export SECRET_KEY="your-secure-random-key"
+export DATABASE_URL="sqlite:///./data/production.db"
+
+# Start the server
+uvicorn rateeye.main:app --host 0.0.0.0 --port 8000
+```
 
 ---
 
-## 4. Manual Installation: Windows
+## 5. Production Hardening
 
-1.  **Environment Setup:**
-    ```powershell
-    python -m venv .venv
-    .venv\Scripts\activate
-    pip install -r requirements.txt
-    ```
-2.  **Build Frontend:**
-    ```powershell
-    npm install
-    npm run build
-    ```
-3. **Run Tests:**
-    ```powershell
-    $env:PYTHONPATH += ";$(Get-Location)\src"
-    pytest
-    ```
-4. **Launch:**
-    ```powershell
-    $env:PYTHONPATH += ";$(Get-Location)\src"
-    python -m rateeye.main
-    ```
+### 1. Reverse Proxy (Nginx)
+Never expose Uvicorn directly to the internet. Use Nginx as a reverse proxy to handle SSL (HTTPS) and static file caching.
 
+### 2. Service Management (Systemd)
+Create a service file at `/etc/systemd/system/rateeye.service`:
+```ini
+[Unit]
+Description=RateEye Yield Tracker
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/rateeye
+Environment="PATH=/opt/rateeye/.venv/bin"
+Environment="DATABASE_URL=sqlite:///./data/rateeye.db"
+ExecStart=/opt/rateeye/.venv/bin/uvicorn rateeye.main:app --host 0.0.0.0 --port 8000
+
+[Install]
+WantedBy=multi-user.target
+```
 
 ---
 
-## 5. Deployment Configuration (Production)
+---
 
-### Environment Variables
-Override the default SQLite database:
-- **Unix:** `export DATABASE_URL="sqlite:///./prod.db"`
-- **Windows:** `$env:DATABASE_URL="sqlite:///./prod.db"`
+## 7. Method C: Distributed & High Availability Deployment
 
-### Security Considerations
-- **HTTPS:** Run RateEye behind a reverse proxy (Nginx/Apache) for SSL termination.
-- **Port:** Default is `8000`.
+For large-scale or production-critical environments, RateEye can be deployed in a distributed manner. This allows you to host the database on a separate server and run multiple instances of the RateEye application behind a load balancer.
 
-## 6. Troubleshooting
-- **Install Logs:** Check `logs/install.log` for detailed failure reasons.
-- **Missing Modules:** Ensure your virtual environment is active.
-- **Build Errors:** Verify Node.js and NPM versions.
+### 1. Separate Database Server
+Instead of the default SQLite file, connect to a robust database like PostgreSQL:
+1.  **Set Up PostgreSQL:** Install and configure PostgreSQL on a dedicated server. Create a database named `rateeye`.
+2.  **Configure `DATABASE_URL`:** On each RateEye app server, set the environment variable:
+    ```bash
+    export DATABASE_URL="postgresql://username:password@db-server-ip:5432/rateeye"
+    ```
+3.  **Drivers:** Ensure you install the appropriate database driver (e.g., `pip install psycopg2-binary`).
+
+### 2. High Availability (Horizontal Scaling)
+Deploy multiple application nodes to handle high traffic and provide redundancy:
+- **Shared Session Key:** All nodes **must** share the same `SECRET_KEY` so that session cookies can be validated by any node.
+- **Shared Storage:** If using profile photo uploads, the `src/rateeye/static/uploads` directory should be mounted on a shared network drive (e.g., NFS, AWS EFS).
+- **Load Balancing:** Use Nginx or an AWS Application Load Balancer (ALB) to distribute traffic across your nodes.
+
+### 3. Containerization (Docker)
+RateEye is fully container-ready. Use the provided `Dockerfile` to build an image:
+```bash
+# Build the image
+docker build -t rateeye:latest .
+
+# Run with an external database
+docker run -d \
+  -p 8000:8000 \
+  -e DATABASE_URL="postgresql://user:pass@db-host/rateeye" \
+  -e SECRET_KEY="your-prod-secret" \
+  rateeye:latest
+```
+
+## 8. Troubleshooting
+- **Build Failures:** Ensure `npm run build` is successful before running `uv build`. Hatchling will package whatever is in the `static/js` folder.
+- **Missing Dependencies:** If running via `uvicorn` directly, ensure all dependencies listed in `pyproject.toml` were installed during the `pip install <wheel>` step.
+- **Permission Errors:** Ensure the user running the application has write access to the `data/` and `logs/` directories.

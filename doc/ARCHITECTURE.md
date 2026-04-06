@@ -50,9 +50,35 @@ Administrative pages follow a standardized pattern for consistency and rapid dev
 
 ### 4.2. Security Data Provider Strategy
 ...
-## 5. Data Model & Segregation
+## 6. Scalability & Distributed Architecture
 
-### 5.1. System vs. User Data
+While RateEye is designed as a streamlined monolith, it follows cloud-native principles that allow it to scale from a single-node local setup to a distributed, high-availability environment.
+
+### 6.1. Component Decoupling
+The application is structured to allow independent scaling of its primary layers:
+
+- **Frontend (Static Assets):** All TypeScript assets are compiled into standard JavaScript and CSS. In a scaled environment, these can be offloaded from the FastAPI server and served via Nginx, an AWS S3 bucket, or a global Content Delivery Network (CDN) like CloudFront.
+- **Backend (API Service):** The FastAPI application is stateless (session state is currently handled via signed cookies/`SECRET_KEY`). Multiple instances can be run behind a Load Balancer (e.g., Nginx, HAProxy, AWS ALB).
+- **Database (Persistence):** By default, RateEye uses SQLite for simplicity. For scaling, the `DATABASE_URL` environment variable can be pointed to a client-server database like **PostgreSQL** or **MySQL** hosted on a separate, dedicated server or a managed service (e.g., AWS RDS).
+
+### 6.2. Scaling Strategies
+
+| Strategy | Local/Small (Default) | Distributed/Production |
+| :--- | :--- | :--- |
+| **Compute** | Single `uvicorn` process | Multiple containers (Docker/K8s) |
+| **Database** | SQLite (`data/rateeye.db`) | PostgreSQL / RDS |
+| **Storage** | Local `uploads/` folder | Shared Volume (EFS) or Object Storage (S3) |
+| **Networking** | Direct Access (Port 8000) | Reverse Proxy (Nginx) + SSL |
+
+### 6.3. Environment Variables
+Scaling is managed primarily through environment configuration:
+- `DATABASE_URL`: Connection string (e.g., `postgresql://user:pass@db-host:5432/rateeye`).
+- `SECRET_KEY`: Must be identical across all backend nodes to allow consistent session validation.
+- `PYTHONPATH`: Should include the `src` directory.
+
+## 7. Data Model & Segregation
+
+### 7.1. System vs. User Data
 RateEye distinguishes between **System Data** (distributed with the application) and **User Data** (created and maintained by the end-user).
 
 - **System Data (`is_system=True`):**
@@ -68,7 +94,7 @@ RateEye distinguishes between **System Data** (distributed with the application)
     - **Custom Roles/Permissions:** Any additional access control entities defined by an administrator.
     - *Purpose:* Holds the personalized data and configuration that makes the application useful for a specific user or organization.
 
-### 5.2. Persistence
+### 7.2. Persistence
 All data is persisted in a local **SQLite** database file (`data/rateeye.db`).
 - **Backup/Restore:** Users can use the built-in Export/Import functionality to migrate their data.
 - **Relational Integrity:** Foreign key constraints ensure that deleting a user or role correctly handles associated permissions and settings.

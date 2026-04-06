@@ -74,6 +74,14 @@ def main():
     logger.info("RATEEYE AUTOMATED INSTALLATION & DEPLOYMENT")
     logger.info("="*60)
     
+    # 0. Sync Version
+    logger.info("--- Step 0: Synchronizing Version from VERSION file ---")
+    if os.path.exists("scripts/sync_version.py"):
+        if not run_command(f"{sys.executable} scripts/sync_version.py"):
+            logger.error("Version synchronization failed. Proceeding with caution.")
+    else:
+        logger.warning("scripts/sync_version.py not found. Skipping version sync.")
+
     os_name = platform.system()
     logger.info(f"Detected OS: {os_name}")
 
