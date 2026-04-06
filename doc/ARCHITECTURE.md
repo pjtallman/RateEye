@@ -67,10 +67,16 @@ The application is structured to allow independent scaling of its primary layers
 | :--- | :--- | :--- |
 | **Compute** | Single `uvicorn` process | Multiple containers (Docker/K8s) |
 | **Database** | SQLite (`data/rateeye.db`) | PostgreSQL / RDS |
-| **Storage** | Local `uploads/` folder | Shared Volume (EFS) or Object Storage (S3) |
+| **Storage** | Local SQLite (`data/`) | Central Database (PostgreSQL) |
 | **Networking** | Direct Access (Port 8000) | Reverse Proxy (Nginx) + SSL |
 
-### 6.3. Environment Variables
+### 6.3. Profile Photo Storage Strategy
+Unlike traditional filesystem-based uploads, RateEye uses **Database BLOB Storage** for profile photos.
+- **Portability:** Eliminates the need for persistent volume mounts (like Docker volumes or NFS) for user media.
+- **Consistency:** Database backups automatically include all user profile photos.
+- **Serving:** Photos are served via a dedicated FastAPI route (`/settings/user/photo/{user_id}`) which retrieves the `LargeBinary` data and serves it with the correct `MIME` type.
+
+### 6.4. Environment Variables
 Scaling is managed primarily through environment configuration:
 - `DATABASE_URL`: Connection string (e.g., `postgresql://user:pass@db-host:5432/rateeye`).
 - `SECRET_KEY`: Must be identical across all backend nodes to allow consistent session validation.
@@ -117,6 +123,8 @@ erDiagram
         bool force_password_change
         string provider
         string photo_url
+        blob photo_blob
+        string photo_mime_type
     }
     Role {
         int id PK
