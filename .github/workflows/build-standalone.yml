@@ -68,7 +68,7 @@ jobs:
         shell: pwsh
         run: |
           cd dist
-          Compress-Archive -Path rateeye.exe, README.md, ../VERSION -DestinationPath ../rateeye-windows.zip -ErrorAction SilentlyContinue
+          Compress-Archive -Path rateeye.exe, ../README.md, ../VERSION -DestinationPath ../rateeye-windows.zip -ErrorAction SilentlyContinue
           if (!(Test-Path ../rateeye-windows.zip)) {
             Compress-Archive -Path rateeye.exe, ../VERSION -DestinationPath ../rateeye-windows.zip
           }
