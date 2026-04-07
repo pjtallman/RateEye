@@ -69,16 +69,12 @@ jobs:
         shell: bash
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)/src
-          # Force PyInstaller to match our Python architecture
-          if [ "${{ matrix.os }}" == "macos-latest" ]; then
-            if [ "${{ matrix.arch }}" == "x64" ]; then
-              pyinstaller --clean --target-arch x86_64 rateeye.spec
-            else
-              pyinstaller --clean --target-arch arm64 rateeye.spec
-            fi
+          if [ "${{ matrix.arch }}" == "x64" ]; then
+            export PYI_ARCH="x86_64"
           else
-            pyinstaller --clean rateeye.spec
+            export PYI_ARCH="arm64"
           fi
+          pyinstaller --clean rateeye.spec
 
       - name: Package Binary (macOS)
         if: matrix.os == 'macos-latest'
