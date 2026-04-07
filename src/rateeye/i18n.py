@@ -1,6 +1,8 @@
 import json
 import os
 
+from .core.paths import BASE_DIR
+
 # Module-level cache for translations: { "en": {...}, "es": {...} }
 TRANSLATIONS_CACHE = {}
 
@@ -9,7 +11,7 @@ def load_language(lang_code: str):
     if lang_code in TRANSLATIONS_CACHE:
         return TRANSLATIONS_CACHE[lang_code]
     
-    path = os.path.join(os.path.dirname(__file__), "locales", f"{lang_code}.json")
+    path = os.path.join(BASE_DIR, "src", "rateeye", "locales", f"{lang_code}.json")
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from fastapi.templating import Jinja2Templates
 
 from ..i18n import get_text
+from ..core.paths import BASE_DIR
 from ..database import get_db, User, Security, Role, Permission, SystemSetting, PageType, get_system_setting
 from ..auth.service import verify_password, get_password_hash
 from ..auth.dependencies import login_required
@@ -17,8 +18,7 @@ from ..security.service import check_page_permission
 from ..data_mgmt.export_import import get_activity_categories
 
 router = APIRouter(prefix="/settings", tags=[PageType.SETTINGS])
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "src", "rateeye", "templates"))
 logger = logging.getLogger(__name__)
 
 @router.get("/user", response_class=HTMLResponse)

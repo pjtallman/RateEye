@@ -1,9 +1,13 @@
 import os
+import sys
 from enum import Enum
 from sqlalchemy import create_engine, Column, String, Integer, Boolean, Text, ForeignKey, Table, Enum as SQLEnum, LargeBinary
 from sqlalchemy.orm import sessionmaker, declarative_base, Session, relationship
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./data/rateeye.db")
+from .core.paths import BASE_DIR, ROOT_DIR
+
+db_path = os.path.join(ROOT_DIR, "data", "rateeye.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{db_path}")
 
 # Only use check_same_thread for SQLite
 engine_kwargs = {}
@@ -140,23 +144,22 @@ def init_db(db: Session = None):
         "app_log_lines": "100", "app_log_retention": "10",
         "test_log_lines": "100", "test_log_retention": "10",
         "startup_log_lines": "100", "startup_log_retention": "10",
-        "version": "unknown" # Placeholder, updated below
+        "version": "unknown"
     }
-    for name, value in log_defaults.items():
-        if not db.query(SystemSetting).filter(SystemSetting.name == name).first():
-            db.add(SystemSetting(name=name, value=value, is_system=True))
+    
+    # Update version from file system if available
+    version_file = os.path.join(BASE_DIR, "VERSION")
+    if os.path.exists(version_file):
+        with open(version_file, "r") as f:
+            v_val = f.read().strip()
+            if v_val: log_defaults["version"] = v_val
 
-    # Sync version from file system
-    if os.path.exists("VERSION"):
-        with open("VERSION", "r") as f:
-            current_version = f.read().strip()
-            if current_version:
-                version_setting = db.query(SystemSetting).filter(SystemSetting.name == "version").first()
-                if version_setting:
-                    version_setting.value = current_version
-                    version_setting.is_system = True
-                else:
-                    db.add(SystemSetting(name="version", value=current_version, is_system=True))
+    for name, value in log_defaults.items():
+        existing = db.query(SystemSetting).filter(SystemSetting.name == name).first()
+        if not existing:
+            db.add(SystemSetting(name=name, value=value, is_system=True))
+        elif name == "version":
+            existing.value = value
     
     # 2. Seed default roles
     admin_role = db.query(Role).filter(Role.name == "Admin").first()

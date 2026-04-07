@@ -192,7 +192,32 @@ The application will now be accessible at `http://localhost`.
 
 ---
 
-## 8. Nginx Configuration Best Practices
+## 9. Method E: Zero-Requirement Standalone Binary (User-Friendly)
+
+This is the fastest and most user-friendly way to run RateEye on a clean machine (e.g., a Mac Mini or Windows PC) without installing Git, Python, Node.js, or Docker.
+
+### How to Install:
+1.  **Download:** Go to the [GitHub Releases](https://github.com/pjtallman/RateEye/releases) page.
+2.  **Select Package:** Download the `.zip` file matching your operating system (e.g., `rateeye-v1.0.6-darwin-x86_64.zip` for Intel Macs).
+3.  **Extract:** Unzip the folder to your preferred location (e.g., Desktop or Applications).
+4.  **Run:** 
+    -   **macOS:** Double-click the `rateeye` executable.
+    -   **Windows:** Double-click `rateeye.exe`.
+
+### What's included?
+The standalone binary is a "frozen" version of the application that includes:
+- A dedicated Python interpreter.
+- All required backend libraries (FastAPI, SQLAlchemy, etc.).
+- Pre-compiled frontend assets (JS/CSS).
+- Integrated SQLite database (initialized on first run in the same folder).
+
+### Verification:
+Once the terminal window opens, navigate to `http://localhost:8000` in your browser.
+
+---
+
+## 10. Nginx Configuration Best Practices
+
 
 Our `nginx/nginx.conf` is optimized for:
 - **Gzip Compression:** Reduces the size of transmitted files (JSON, JS, CSS).

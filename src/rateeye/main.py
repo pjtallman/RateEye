@@ -8,6 +8,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
 
 # Local Imports
+from .core.paths import BASE_DIR
 from .database import SessionLocal, init_db, get_db, PageType, get_system_setting
 from .i18n import get_text
 from .core.logging_config import (
@@ -21,7 +22,6 @@ from .routers import public, settings, admin
 # Environment & Testing Check
 IS_TESTING = "pytest" in os.environ.get("PYTEST_CURRENT_TEST", "") or "PYTEST_VERSION" in os.environ
 SECRET_KEY = os.environ.get("SECRET_KEY", "a-very-secret-key-for-development")
-BASE_DIR = os.path.dirname(__file__)
 
 # --- 1. LOGGING & INITIALIZATION ---
 setup_startup_logging(IS_TESTING)
@@ -42,8 +42,8 @@ app = FastAPI(title="RateEye")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, max_age=86400)
 
 # Mount static and templates
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "src", "rateeye", "static")), name="static")
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "src", "rateeye", "templates"))
 templates.env.filters["format_num"] = format_num
 
 # Exception Handlers

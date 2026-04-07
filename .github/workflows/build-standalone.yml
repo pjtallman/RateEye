@@ -1,0 +1,99 @@
+name: Build Standalone Binaries
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-latest
+            artifact_name: rateeye-macos
+            asset_name: rateeye-macos.zip
+          - os: windows-latest
+            artifact_name: rateeye-windows
+            asset_name: rateeye-windows.zip
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # Use 3.11 for broader compatibility than 3.14
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Frontend Dependencies
+        run: npm install
+
+      - name: Build Frontend
+        run: npm run build
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller uvicorn fastapi sqlalchemy jinja2 passlib bcrypt==3.2.2 python-multipart pyyaml curl-cffi yfinance pandas
+
+      - name: Build Standalone with PyInstaller
+        shell: bash
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+          pyinstaller --clean rateeye.spec
+
+      - name: Package Binary (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd dist
+          zip -r ../rateeye-macos.zip rateeye README.md ../VERSION || zip -r ../rateeye-macos.zip rateeye ../VERSION
+          cd ..
+
+      - name: Package Binary (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          cd dist
+          Compress-Archive -Path rateeye.exe, README.md, ../VERSION -DestinationPath ../rateeye-windows.zip -ErrorAction SilentlyContinue
+          if (!(Test-Path ../rateeye-windows.zip)) {
+            Compress-Archive -Path rateeye.exe, ../VERSION -DestinationPath ../rateeye-windows.zip
+          }
+          cd ..
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.asset_name }}
+
+  release:
+    name: Create Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/rateeye-macos/rateeye-macos.zip
+            artifacts/rateeye-windows/rateeye-windows.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

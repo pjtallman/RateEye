@@ -3,10 +3,11 @@ import logging
 import shutil
 from datetime import datetime
 from sqlalchemy.orm import Session
+from .paths import ROOT_DIR
 from ..database import get_system_setting
 
 # --- LOGGING & ENVIRONMENT SETUP ---
-LOG_DIR = os.environ.get("LOG_DIR", "logs")
+LOG_DIR = os.path.join(ROOT_DIR, os.environ.get("LOG_DIR", "logs"))
 ACTIVE_LOG = os.path.join(LOG_DIR, "RateEye.log")
 STARTUP_LOG = os.path.join(LOG_DIR, "startup.log")
 TEST_LOG = os.path.join(LOG_DIR, "test_RateEye.log")
