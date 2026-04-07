@@ -14,19 +14,26 @@ permissions:
 
 jobs:
   build:
-    name: Build for ${{ matrix.os }}
+    name: Build ${{ matrix.os }} (${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-12, macos-latest, windows-latest]
+        os: [macos-latest, windows-latest]
+        arch: [x64, arm64]
+        exclude:
+          - os: windows-latest
+            arch: arm64 # We'll stick to x64 for Windows for maximum compatibility
         include:
-          - os: macos-12
+          - os: macos-latest
+            arch: x64
             artifact_name: rateeye-macos-intel
             asset_name: rateeye-macos-intel.zip
           - os: macos-latest
+            arch: arm64
             artifact_name: rateeye-macos-arm64
             asset_name: rateeye-macos-arm64.zip
           - os: windows-latest
+            arch: x64
             artifact_name: rateeye-windows
             asset_name: rateeye-windows.zip
 
@@ -39,7 +46,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # Use 3.11 for broader compatibility than 3.14
+          python-version: '3.11'
+          architecture: ${{ matrix.arch }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -61,13 +69,22 @@ jobs:
         shell: bash
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)/src
-          pyinstaller --clean rateeye.spec
+          # Force PyInstaller to match our Python architecture
+          if [ "${{ matrix.os }}" == "macos-latest" ]; then
+            if [ "${{ matrix.arch }}" == "x64" ]; then
+              pyinstaller --clean --target-arch x86_64 rateeye.spec
+            else
+              pyinstaller --clean --target-arch arm64 rateeye.spec
+            fi
+          else
+            pyinstaller --clean rateeye.spec
+          fi
 
       - name: Package Binary (macOS)
         if: matrix.os == 'macos-latest'
         run: |
           cd dist
-          zip -r ../rateeye-macos.zip rateeye README.md ../VERSION || zip -r ../rateeye-macos.zip rateeye ../VERSION
+          zip -r ../${{ matrix.asset_name }} rateeye ../README.md ../VERSION
           cd ..
 
       - name: Package Binary (Windows)
@@ -75,10 +92,7 @@ jobs:
         shell: pwsh
         run: |
           cd dist
-          Compress-Archive -Path rateeye.exe, ../README.md, ../VERSION -DestinationPath ../rateeye-windows.zip -ErrorAction SilentlyContinue
-          if (!(Test-Path ../rateeye-windows.zip)) {
-            Compress-Archive -Path rateeye.exe, ../VERSION -DestinationPath ../rateeye-windows.zip
-          }
+          Compress-Archive -Path rateeye.exe, ../README.md, ../VERSION -DestinationPath ../${{ matrix.asset_name }}
           cd ..
 
       - name: Upload Artifact
