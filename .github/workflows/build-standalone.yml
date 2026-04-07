@@ -18,9 +18,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-13, macos-latest, windows-latest]
+        os: [macos-12, macos-latest, windows-latest]
         include:
-          - os: macos-13
+          - os: macos-12
             artifact_name: rateeye-macos-intel
             asset_name: rateeye-macos-intel.zip
           - os: macos-latest
