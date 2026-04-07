@@ -18,11 +18,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-13, macos-latest, windows-latest]
         include:
+          - os: macos-13
+            artifact_name: rateeye-macos-intel
+            asset_name: rateeye-macos-intel.zip
           - os: macos-latest
-            artifact_name: rateeye-macos
-            asset_name: rateeye-macos.zip
+            artifact_name: rateeye-macos-arm64
+            asset_name: rateeye-macos-arm64.zip
           - os: windows-latest
             artifact_name: rateeye-windows
             asset_name: rateeye-windows.zip
@@ -99,7 +102,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/rateeye-macos/rateeye-macos.zip
+            artifacts/rateeye-macos-intel/rateeye-macos-intel.zip
+            artifacts/rateeye-macos-arm64/rateeye-macos-arm64.zip
             artifacts/rateeye-windows/rateeye-windows.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
