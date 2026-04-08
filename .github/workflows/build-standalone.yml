@@ -98,7 +98,11 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          # Use Inno Setup Compiler (iscc) which is available on windows-latest
+          # Copy support files into dist so Inno Setup can find them
+          Copy-Item INSTALL_GUIDE.txt dist/
+          Copy-Item COPYRIGHT.txt dist/
+          Copy-Item VERSION dist/
+          # Run Inno Setup Compiler (iscc)
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" scripts/windows_installer.iss
           Move-Item -Path rateeye-windows-setup.exe -Destination ${{ matrix.asset_name }}
 
