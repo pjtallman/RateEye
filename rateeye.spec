@@ -39,7 +39,8 @@ a = Analysis(
         'rateeye.routers.settings',
         'rateeye.routers.admin',
         'webbrowser',
-        'threading'
+        'threading',
+        'passlib.handlers.bcrypt'
     ],
     hookspath=[],
     hooksconfig={},
