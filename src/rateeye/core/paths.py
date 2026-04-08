@@ -20,10 +20,16 @@ def get_writable_root():
     home_dir = os.path.expanduser("~")
     app_folder = os.path.join(home_dir, "RateEye")
     
+    # Ensure root folder and data subfolder exist
+    if not os.path.exists(app_folder):
+        os.makedirs(app_folder, exist_ok=True)
+    
+    data_folder = os.path.join(app_folder, "data")
+    if not os.path.exists(data_folder):
+        os.makedirs(data_folder, exist_ok=True)
+
     # If running as a bundle, ALWAYS use ~/RateEye
     if getattr(sys, 'frozen', False):
-        if not os.path.exists(app_folder):
-            os.makedirs(app_folder, exist_ok=True)
         return app_folder
 
     cwd = os.getcwd()
@@ -31,9 +37,6 @@ def get_writable_root():
     if os.access(cwd, os.W_OK) and not cwd == "/":
         return cwd
     
-    # Fallback for any other case
-    if not os.path.exists(app_folder):
-        os.makedirs(app_folder, exist_ok=True)
     return app_folder
 
 ROOT_DIR = get_writable_root()

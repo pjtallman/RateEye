@@ -68,6 +68,10 @@ if __name__ == "__main__":
         # Early import to check paths
         from rateeye.core.paths import ROOT_DIR
         log(f"User Data Root: {ROOT_DIR}")
+        
+        # Explicitly ensure the data folder exists before anything else
+        os.makedirs(os.path.join(ROOT_DIR, "data"), exist_ok=True)
+        log(f"Data folder verified")
 
         from rateeye.main import app
         import uvicorn

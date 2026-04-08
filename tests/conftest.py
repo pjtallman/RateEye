@@ -5,13 +5,17 @@ from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
 # Must set this before importing app or database
-os.environ["DATABASE_URL"] = "sqlite:///./data/test_rateeye.db"
+test_db_path = os.path.abspath(os.path.join("data", "test_rateeye.db"))
+if os.name == 'nt':
+    os.environ["DATABASE_URL"] = f"sqlite:///{test_db_path}"
+else:
+    os.environ["DATABASE_URL"] = f"sqlite:////{test_db_path.lstrip('/')}"
 
 from rateeye.database import Base, get_db, User, UserSetting, SystemSetting, Role, pwd_context, user_roles, Security
 from rateeye.main import app
 
 # Test database setup
-TEST_DATABASE_URL = "sqlite:///./data/test_rateeye.db"
+TEST_DATABASE_URL = os.environ["DATABASE_URL"]
 engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

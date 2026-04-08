@@ -7,7 +7,16 @@ from sqlalchemy.orm import sessionmaker, declarative_base, Session, relationship
 from .core.paths import BASE_DIR, ROOT_DIR
 
 db_path = os.path.join(ROOT_DIR, "data", "rateeye.db")
-DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{db_path}")
+# Standard SQLAlchemy format for absolute path on Unix is sqlite:////path/to/db
+# On Windows it is sqlite:///C:\path\to\db
+if DATABASE_URL_ENV := os.environ.get("DATABASE_URL"):
+    DATABASE_URL = DATABASE_URL_ENV
+else:
+    if os.name == 'nt':
+        DATABASE_URL = f"sqlite:///{db_path}"
+    else:
+        # Four slashes for absolute path on Unix
+        DATABASE_URL = f"sqlite:////{db_path.lstrip('/')}"
 
 # Only use check_same_thread for SQLite
 engine_kwargs = {}
