@@ -192,16 +192,20 @@ The application will now be accessible at `http://localhost`.
 
 ---
 
-## 9. Method E: Zero-Requirement Standalone Binary (User-Friendly)
+## 9. Method E: Native Standalone Installers (User-Friendly)
 
-This is the fastest way to run RateEye on a clean machine (e.g., a Mac Mini or Windows PC).
+This is the recommended way for non-technical users to install RateEye on macOS or Windows.
 
-For detailed, step-by-step instructions designed for end-users, please refer to the **`INSTALL.md`** file included in the root of the project and inside every distribution `.zip` file.
+For detailed, step-by-step instructions, please refer to the **`INSTALL_GUIDE.txt`** file included in the root of the project and inside every distribution package.
 
 ### Summary of steps:
-1.  **Download** the `.zip` for your OS from the Releases page.
-2.  **Extract** to a new folder named `rateeye`.
-3.  **Run** the `rateeye` executable (handling OS security prompts as described in `INSTALL.md`).
+1.  **Download** the installer for your OS from the Releases page:
+    -   macOS (Intel or ARM64): `.dmg` file.
+    -   Windows: `.exe` Setup file.
+2.  **Run the Installer**:
+    -   **macOS**: Open the DMG and drag RateEye to your Applications folder.
+    -   **Windows**: Run the setup wizard and follow the prompts to choose your installation directory.
+3.  **Run RateEye** (handling OS security prompts as described in `INSTALL_GUIDE.txt`).
 4.  **Access** via `http://localhost:8000`.
 
 ---

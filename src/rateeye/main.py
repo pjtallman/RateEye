@@ -90,4 +90,14 @@ def get_security_endpoint(db: Session):
 
 if __name__ == "__main__":
     import uvicorn
+    import webbrowser
+    from threading import Timer
+
+    def open_browser():
+        webbrowser.open("http://127.0.0.1:8000")
+
+    # Only auto-open if not in testing mode
+    if not IS_TESTING:
+        Timer(1.5, open_browser).start()
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -11,7 +11,8 @@ data_files = [
     ('src/rateeye/locales', 'rateeye/locales'),
     ('src/rateeye/metadata', 'rateeye/metadata'),
     ('VERSION', '.'),
-    ('INSTALL.md', '.'),
+    ('INSTALL_GUIDE.txt', '.'),
+    ('COPYRIGHT.txt', '.'),
 ]
 
 
