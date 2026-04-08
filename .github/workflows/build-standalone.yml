@@ -1,4 +1,4 @@
-name: Build Standalone Binaries
+name: Build Standalone Installers
 
 on:
   push:
@@ -22,20 +22,20 @@ jobs:
         arch: [x64, arm64]
         exclude:
           - os: windows-latest
-            arch: arm64 # We'll stick to x64 for Windows for maximum compatibility
+            arch: arm64
         include:
           - os: macos-latest
             arch: x64
             artifact_name: rateeye-macos-intel
-            asset_name: rateeye-macos-intel.zip
+            asset_name: rateeye-macos-intel.dmg
           - os: macos-latest
             arch: arm64
             artifact_name: rateeye-macos-arm64
-            asset_name: rateeye-macos-arm64.zip
+            asset_name: rateeye-macos-arm64.dmg
           - os: windows-latest
             arch: x64
-            artifact_name: rateeye-windows
-            asset_name: rateeye-windows.zip
+            artifact_name: rateeye-windows-setup
+            asset_name: rateeye-windows-setup.exe
 
     steps:
       - name: Checkout Code
@@ -85,20 +85,22 @@ jobs:
             pyinstaller --clean rateeye.spec
           fi
 
-      - name: Package Binary (macOS)
+      - name: Create macOS DMG
         if: matrix.os == 'macos-latest'
         run: |
-          cd dist
-          zip -r ../${{ matrix.asset_name }} rateeye ../INSTALL.md ../VERSION
-          cd ..
+          mkdir -p dist/dmg_content
+          cp dist/rateeye dist/dmg_content/
+          cp INSTALL_GUIDE.txt dist/dmg_content/
+          cp COPYRIGHT.txt dist/dmg_content/
+          hdiutil create -volname "RateEye Installer" -srcfolder dist/dmg_content -ov -format UDZO ${{ matrix.asset_name }}
 
-      - name: Package Binary (Windows)
+      - name: Create Windows Installer (Inno Setup)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          cd dist
-          Compress-Archive -Path rateeye.exe, ../INSTALL.md, ../VERSION -DestinationPath ../${{ matrix.asset_name }}
-          cd ..
+          # Use Inno Setup Compiler (iscc) which is available on windows-latest
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" scripts/windows_installer.iss
+          Move-Item -Path rateeye-windows-setup.exe -Destination ${{ matrix.asset_name }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -121,8 +123,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/rateeye-macos-intel/rateeye-macos-intel.zip
-            artifacts/rateeye-macos-arm64/rateeye-macos-arm64.zip
-            artifacts/rateeye-windows/rateeye-windows.zip
+            artifacts/rateeye-macos-intel/rateeye-macos-intel.dmg
+            artifacts/rateeye-macos-arm64/rateeye-macos-arm64.dmg
+            artifacts/rateeye-windows-setup/rateeye-windows-setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
