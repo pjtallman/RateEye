@@ -14,4 +14,19 @@ def get_base_dir():
         return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 BASE_DIR = get_base_dir()
-ROOT_DIR = os.getcwd() # Use CWD for logs and data to keep them outside the temp bundle
+
+def get_writable_root():
+    """Returns a writable directory for logs and data."""
+    cwd = os.getcwd()
+    # Check if CWD is writable
+    if os.access(cwd, os.W_OK):
+        return cwd
+    
+    # If not writable (like in a DMG), use ~/RateEye
+    home_dir = os.path.expanduser("~")
+    fallback = os.path.join(home_dir, "RateEye")
+    if not os.path.exists(fallback):
+        os.makedirs(fallback, exist_ok=True)
+    return fallback
+
+ROOT_DIR = get_writable_root()
