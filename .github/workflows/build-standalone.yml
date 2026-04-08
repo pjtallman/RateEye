@@ -61,6 +61,7 @@ jobs:
         run: npm run build
 
       - name: Install Python Dependencies
+        shell: bash
         run: |
           if [ "${{ matrix.arch }}" == "x64" ] && [ "${{ matrix.os }}" == "macos-latest" ]; then
             arch -x86_64 python -m pip install --upgrade pip
