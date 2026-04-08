@@ -44,6 +44,7 @@ a = Analysis(
         'anyio.backends._asyncio',
         'multipart',
         'itsdangerous',
+        'httpx',
         
         # Authentication & Security
         'authlib',
