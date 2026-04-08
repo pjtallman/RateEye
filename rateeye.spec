@@ -15,9 +15,8 @@ data_files = [
     ('COPYRIGHT.txt', '.'),
 ]
 
-
 a = Analysis(
-    ['src/rateeye/main.py'],
+    ['launcher.py'],
     pathex=['src'],
     binaries=[],
     datas=data_files,
@@ -32,7 +31,13 @@ a = Analysis(
         'jinja2.ext',
         'email.mime.text',
         'email.mime.multipart',
-        'itsdangerous'
+        'itsdangerous',
+        'rateeye.core.paths',
+        'rateeye.database',
+        'rateeye.i18n',
+        'rateeye.routers.public',
+        'rateeye.routers.settings',
+        'rateeye.routers.admin'
     ],
     hookspath=[],
     hooksconfig={},
@@ -48,17 +53,13 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
-    name='rateeye',
+    exclude_binaries=True,
+    name='RateEye',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
     console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -66,3 +67,27 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='RateEye',
+)
+
+# Standard macOS Bundle Configuration
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        coll,
+        name='RateEye.app',
+        icon=None,
+        bundle_identifier='com.rateeye.app',
+        info_plist={
+            'NSHighResolutionCapable': 'True',
+            'LSBackgroundOnly': 'False',
+        },
+    )
