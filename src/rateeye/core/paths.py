@@ -17,23 +17,23 @@ BASE_DIR = get_base_dir()
 
 def get_writable_root():
     """Returns a writable directory for logs and data."""
-    # If running as a bundle, default to ~/RateEye
+    home_dir = os.path.expanduser("~")
+    app_folder = os.path.join(home_dir, "RateEye")
+    
+    # If running as a bundle, ALWAYS use ~/RateEye
     if getattr(sys, 'frozen', False):
-        home_dir = os.path.expanduser("~")
-        fallback = os.path.join(home_dir, "RateEye")
-        if not os.path.exists(fallback):
-            os.makedirs(fallback, exist_ok=True)
-        return fallback
+        if not os.path.exists(app_folder):
+            os.makedirs(app_folder, exist_ok=True)
+        return app_folder
 
     cwd = os.getcwd()
-    # Check if CWD is writable (for dev mode)
+    # If CWD is writable and not system root, use it (for dev)
     if os.access(cwd, os.W_OK) and not cwd == "/":
         return cwd
     
-    home_dir = os.path.expanduser("~")
-    fallback = os.path.join(home_dir, "RateEye")
-    if not os.path.exists(fallback):
-        os.makedirs(fallback, exist_ok=True)
-    return fallback
+    # Fallback for any other case
+    if not os.path.exists(app_folder):
+        os.makedirs(app_folder, exist_ok=True)
+    return app_folder
 
 ROOT_DIR = get_writable_root()

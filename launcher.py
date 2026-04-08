@@ -2,40 +2,72 @@ import sys
 import os
 import multiprocessing
 import traceback
+import time
+
+# 1. Setup emergency logging IMMEDIATELY
+home = os.path.expanduser("~")
+app_dir = os.path.join(home, "RateEye")
+log_dir = os.path.join(app_dir, "logs")
+
+try:
+    os.makedirs(log_dir, exist_ok=True)
+    boot_log_path = os.path.join(log_dir, "boot.log")
+    boot_log = open(boot_log_path, "a", buffering=1)
+except Exception:
+    # If we can't even open a log file in home dir, we are in deep trouble
+    boot_log = None
+
+def log(msg):
+    if boot_log:
+        try:
+            boot_log.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n")
+        except:
+            pass
+
+# Redirect stdout and stderr
+if boot_log:
+    sys.stdout = boot_log
+    sys.stderr = boot_log
+
+log("--- Sequoia-Ready Launcher Bootstrap Starting ---")
+log(f"Executable: {sys.executable}")
+log(f"CWD: {os.getcwd()}")
 
 def show_error(msg):
     """Shows a macOS or Windows error dialog."""
-    print(msg) # Still print to console
+    log(f"CRITICAL ERROR: {msg}")
     try:
         if sys.platform == 'darwin':
-            os.system(f"osascript -e 'display alert \"RateEye Startup Error\" message \"{msg}\" buttons {{\"OK\"}} default button \"OK\"'")
+            # Escape for AppleScript
+            escaped = msg.replace('"', '\\"').replace("'", "'\"'\"'")
+            os.system(f"osascript -e 'display alert \"RateEye Error\" message \"{escaped}\" buttons {{\"OK\"}}'")
         elif sys.platform == 'win32':
             import ctypes
-            ctypes.windll.user32.MessageBoxW(0, msg, "RateEye Startup Error", 0x10)
+            ctypes.windll.user32.MessageBoxW(0, msg, "RateEye Error", 0x10)
     except:
         pass
 
 if __name__ == "__main__":
-    # Required for PyInstaller bundles using uvicorn/multiprocessing
+    # Required for frozen apps using uvicorn
     multiprocessing.freeze_support()
     
     try:
-        # Add 'src' to the path so 'rateeye' is found as a package
-        if getattr(sys, 'frozen', False):
+        if getattr(sys, "frozen", False):
             base_path = sys._MEIPASS
         else:
             base_path = os.path.dirname(os.path.abspath(__file__))
             
+        log(f"Internal Base path: {base_path}")
+        
         src_path = os.path.join(base_path, "src")
         if os.path.exists(src_path):
             sys.path.insert(0, src_path)
         else:
-            # In some bundle modes, MEIPASS is the root
             sys.path.insert(0, base_path)
 
-        # Import paths early to initialize ROOT_DIR
+        # Early import to check paths
         from rateeye.core.paths import ROOT_DIR
-        print(f"RateEye initializing... Data/Logs located at: {ROOT_DIR}")
+        log(f"User Data Root: {ROOT_DIR}")
 
         from rateeye.main import app
         import uvicorn
@@ -43,17 +75,21 @@ if __name__ == "__main__":
         from threading import Timer
 
         def open_browser():
-            webbrowser.open("http://127.0.0.1:8000")
+            log("Attempting to open browser...")
+            try:
+                webbrowser.open("http://127.0.0.1:8000")
+            except Exception as e:
+                log(f"Browser open failed: {e}")
 
-        # Check if we are running in a test environment
         is_testing = "pytest" in os.environ.get("PYTEST_CURRENT_TEST", "")
-        
         if not is_testing:
-            Timer(1.5, open_browser).start()
+            Timer(2.5, open_browser).start()
 
-        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+        log("Starting server on 127.0.0.1:8000")
+        uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info", access_log=True)
 
     except Exception as e:
-        error_msg = f"Failed to start RateEye:\n\n{str(e)}\n\n{traceback.format_exc()}"
-        show_error(error_msg)
+        tb = traceback.format_exc()
+        log(f"FATAL EXCEPTION: {e}\n{tb}")
+        show_error(f"Failed to start RateEye:\n{str(e)}")
         sys.exit(1)

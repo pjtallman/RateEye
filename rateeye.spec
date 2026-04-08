@@ -37,7 +37,9 @@ a = Analysis(
         'rateeye.i18n',
         'rateeye.routers.public',
         'rateeye.routers.settings',
-        'rateeye.routers.admin'
+        'rateeye.routers.admin',
+        'webbrowser',
+        'threading'
     ],
     hookspath=[],
     hooksconfig={},
@@ -89,5 +91,9 @@ if sys.platform == 'darwin':
         info_plist={
             'NSHighResolutionCapable': 'True',
             'LSBackgroundOnly': 'False',
+            'NSAppleEventsUsageDescription': 'RateEye needs permission to show startup alerts and open your browser.',
+            'CFBundleShortVersionString': '1.0.6',
+            'CFBundleVersion': '1.0.6',
+            'NSLocalNetworkUsageDescription': 'RateEye runs a local web server to provide the dashboard.',
         },
     )
