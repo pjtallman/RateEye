@@ -194,25 +194,15 @@ The application will now be accessible at `http://localhost`.
 
 ## 9. Method E: Zero-Requirement Standalone Binary (User-Friendly)
 
-This is the fastest and most user-friendly way to run RateEye on a clean machine (e.g., a Mac Mini or Windows PC) without installing Git, Python, Node.js, or Docker.
+This is the fastest way to run RateEye on a clean machine (e.g., a Mac Mini or Windows PC).
 
-### How to Install:
-1.  **Download:** Go to the [GitHub Releases](https://github.com/pjtallman/RateEye/releases) page.
-2.  **Select Package:** Download the `.zip` file matching your operating system (e.g., `rateeye-v1.0.6-darwin-x86_64.zip` for Intel Macs).
-3.  **Extract:** Unzip the folder to your preferred location (e.g., Desktop or Applications).
-4.  **Run:** 
-    -   **macOS:** Double-click the `rateeye` executable.
-    -   **Windows:** Double-click `rateeye.exe`.
+For detailed, step-by-step instructions designed for end-users, please refer to the **`INSTALL.md`** file included in the root of the project and inside every distribution `.zip` file.
 
-### What's included?
-The standalone binary is a "frozen" version of the application that includes:
-- A dedicated Python interpreter.
-- All required backend libraries (FastAPI, SQLAlchemy, etc.).
-- Pre-compiled frontend assets (JS/CSS).
-- Integrated SQLite database (initialized on first run in the same folder).
-
-### Verification:
-Once the terminal window opens, navigate to `http://localhost:8000` in your browser.
+### Summary of steps:
+1.  **Download** the `.zip` for your OS from the Releases page.
+2.  **Extract** to a new folder named `rateeye`.
+3.  **Run** the `rateeye` executable (handling OS security prompts as described in `INSTALL.md`).
+4.  **Access** via `http://localhost:8000`.
 
 ---
 

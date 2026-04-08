@@ -89,7 +89,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           cd dist
-          zip -r ../${{ matrix.asset_name }} rateeye ../README.md ../VERSION
+          zip -r ../${{ matrix.asset_name }} rateeye ../INSTALL.md ../VERSION
           cd ..
 
       - name: Package Binary (Windows)
@@ -97,7 +97,7 @@ jobs:
         shell: pwsh
         run: |
           cd dist
-          Compress-Archive -Path rateeye.exe, ../README.md, ../VERSION -DestinationPath ../${{ matrix.asset_name }}
+          Compress-Archive -Path rateeye.exe, ../INSTALL.md, ../VERSION -DestinationPath ../${{ matrix.asset_name }}
           cd ..
 
       - name: Upload Artifact

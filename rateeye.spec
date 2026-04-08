@@ -6,12 +6,14 @@ block_cipher = None
 
 # We need to explicitly include all data folders from src/rateeye
 data_files = [
-    ('src/rateeye/static', 'src/rateeye/static'),
-    ('src/rateeye/templates', 'src/rateeye/templates'),
-    ('src/rateeye/locales', 'src/rateeye/locales'),
-    ('src/rateeye/metadata', 'src/rateeye/metadata'),
+    ('src/rateeye/static', 'rateeye/static'),
+    ('src/rateeye/templates', 'rateeye/templates'),
+    ('src/rateeye/locales', 'rateeye/locales'),
+    ('src/rateeye/metadata', 'rateeye/metadata'),
     ('VERSION', '.'),
+    ('INSTALL.md', '.'),
 ]
+
 
 a = Analysis(
     ['src/rateeye/main.py'],
