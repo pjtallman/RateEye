@@ -62,19 +62,27 @@ jobs:
 
       - name: Install Python Dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install pyinstaller uvicorn fastapi sqlalchemy jinja2 passlib bcrypt==3.2.2 python-multipart pyyaml curl-cffi yfinance pandas
+          if [ "${{ matrix.arch }}" == "x64" ] && [ "${{ matrix.os }}" == "macos-latest" ]; then
+            arch -x86_64 python -m pip install --upgrade pip
+            arch -x86_64 pip install pyinstaller uvicorn fastapi sqlalchemy jinja2 passlib bcrypt==3.2.2 python-multipart pyyaml curl-cffi yfinance pandas
+          else
+            python -m pip install --upgrade pip
+            pip install pyinstaller uvicorn fastapi sqlalchemy jinja2 passlib bcrypt==3.2.2 python-multipart pyyaml curl-cffi yfinance pandas
+          fi
 
       - name: Build Standalone with PyInstaller
         shell: bash
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)/src
-          if [ "${{ matrix.arch }}" == "x64" ]; then
+          if [ "${{ matrix.arch }}" == "x64" ] && [ "${{ matrix.os }}" == "macos-latest" ]; then
             export PYI_ARCH="x86_64"
-          else
+            arch -x86_64 pyinstaller --clean rateeye.spec
+          elif [ "${{ matrix.arch }}" == "arm64" ] && [ "${{ matrix.os }}" == "macos-latest" ]; then
             export PYI_ARCH="arm64"
+            pyinstaller --clean rateeye.spec
+          else
+            pyinstaller --clean rateeye.spec
           fi
-          pyinstaller --clean rateeye.spec
 
       - name: Package Binary (macOS)
         if: matrix.os == 'macos-latest'
