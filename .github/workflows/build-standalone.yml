@@ -65,10 +65,10 @@ jobs:
         run: |
           if [ "${{ matrix.arch }}" == "x64" ] && [ "${{ matrix.os }}" == "macos-latest" ]; then
             arch -x86_64 python -m pip install --upgrade pip
-            arch -x86_64 pip install pyinstaller uvicorn fastapi sqlalchemy jinja2 passlib bcrypt==3.2.2 python-multipart pyyaml curl-cffi yfinance pandas itsdangerous
+            arch -x86_64 pip install pyinstaller uvicorn fastapi sqlalchemy jinja2 passlib bcrypt==3.2.2 python-multipart pyyaml curl-cffi yfinance pandas itsdangerous authlib python-jose[cryptography] beautifulsoup4
           else
             python -m pip install --upgrade pip
-            pip install pyinstaller uvicorn fastapi sqlalchemy jinja2 passlib bcrypt==3.2.2 python-multipart pyyaml curl-cffi yfinance pandas itsdangerous
+            pip install pyinstaller uvicorn fastapi sqlalchemy jinja2 passlib bcrypt==3.2.2 python-multipart pyyaml curl-cffi yfinance pandas itsdangerous authlib python-jose[cryptography] beautifulsoup4
           fi
 
       - name: Build Standalone with PyInstaller
