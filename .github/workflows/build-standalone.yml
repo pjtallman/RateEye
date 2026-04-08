@@ -89,9 +89,12 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           mkdir -p dist/dmg_content
-          cp dist/rateeye dist/dmg_content/
+          cp dist/rateeye dist/dmg_content/RateEye
           cp INSTALL_GUIDE.txt dist/dmg_content/
           cp COPYRIGHT.txt dist/dmg_content/
+          # Create a symbolic link to Applications
+          ln -s /Applications dist/dmg_content/Applications
+          # Create the DMG
           hdiutil create -volname "RateEye Installer" -srcfolder dist/dmg_content -ov -format UDZO ${{ matrix.asset_name }}
 
       - name: Create Windows Installer (Inno Setup)
