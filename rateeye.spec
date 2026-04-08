@@ -31,7 +31,8 @@ a = Analysis(
         'sqlalchemy.sql.default_comparator',
         'jinja2.ext',
         'email.mime.text',
-        'email.mime.multipart'
+        'email.mime.multipart',
+        'itsdangerous'
     ],
     hookspath=[],
     hooksconfig={},
