@@ -11,10 +11,10 @@ OutputDir=..
 OutputBaseFilename=rateeye-windows-setup
 
 [Files]
-Source: "rateeye.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "INSTALL_GUIDE.txt"; DestDir: "{app}"; Flags: ignoreversion
-Source: "COPYRIGHT.txt"; DestDir: "{app}"; Flags: ignoreversion
-Source: "VERSION"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\rateeye.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\INSTALL_GUIDE.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\COPYRIGHT.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\VERSION"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\RateEye"; Filename: "{app}\rateeye.exe"
