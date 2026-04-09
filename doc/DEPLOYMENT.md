@@ -158,26 +158,12 @@ Instead of the default SQLite file, connect to a robust database like PostgreSQL
 ### 2. High Availability (Horizontal Scaling)
 Deploy multiple application nodes to handle high traffic and provide redundancy:
 - **Shared Session Key:** All nodes **must** share the same `SECRET_KEY` so that session cookies can be validated by any node.
-- **Shared Storage:** If using profile photo uploads, the `src/rateeye/static/uploads` directory should be mounted on a shared network drive (e.g., NFS, AWS EFS).
+- **Portability (BLOB Storage):** RateEye stores profile photos as BLOBs in the database. This eliminates the need for shared network volumes (NFS/EFS) for user media, simplifying horizontal scaling.
 - **Load Balancing:** Use Nginx or an AWS Application Load Balancer (ALB) to distribute traffic across your nodes.
-
-### 3. Containerization (Docker)
-RateEye is fully container-ready. Use the provided `Dockerfile` to build an image:
-```bash
-# Build the image
-docker build -t rateeye:latest .
-
-# Run with an external database
-docker run -d \
-  -p 8000:8000 \
-  -e DATABASE_URL="postgresql://user:pass@db-host/rateeye" \
-  -e SECRET_KEY="your-prod-secret" \
-  rateeye:latest
-```
 
 ---
 
-## 8. Method D: Containerized Deployment (Docker Compose & Nginx)
+## 7. Method D: Containerized Deployment (Docker Compose & Nginx)
 
 For a professional-grade, easy-to-manage production environment, we use **Docker Compose** to orchestrate the FastAPI application and an **Nginx** reverse proxy.
 
@@ -206,7 +192,26 @@ The application will now be accessible at `http://localhost`.
 
 ---
 
-## 9. Nginx Configuration Best Practices
+## 9. Method E: Native Standalone Installers (User-Friendly)
+
+This is the recommended way for non-technical users to install RateEye on macOS or Windows.
+
+For detailed, step-by-step instructions, please refer to the **`INSTALL_GUIDE.txt`** file included in the root of the project and inside every distribution package.
+
+### Summary of steps:
+1.  **Download** the installer for your OS from the Releases page:
+    -   macOS (Intel or ARM64): `.dmg` file.
+    -   Windows: `.exe` Setup file.
+2.  **Run the Installer**:
+    -   **macOS**: Open the DMG and drag RateEye to your Applications folder.
+    -   **Windows**: Run the setup wizard and follow the prompts to choose your installation directory.
+3.  **Run RateEye** (handling OS security prompts as described in `INSTALL_GUIDE.txt`).
+4.  **Access** via `http://localhost:8000`.
+
+---
+
+## 10. Nginx Configuration Best Practices
+
 
 Our `nginx/nginx.conf` is optimized for:
 - **Gzip Compression:** Reduces the size of transmitted files (JSON, JS, CSS).
@@ -218,7 +223,7 @@ Our `nginx/nginx.conf` is optimized for:
 
 ---
 
-## 10. Troubleshooting
+## 9. Troubleshooting
 - **Build Failures:** Ensure `npm run build` is successful before running `uv build`. Hatchling will package whatever is in the `static/js` folder.
 - **Missing Dependencies:** If running via `uvicorn` directly, ensure all dependencies listed in `pyproject.toml` were installed during the `pip install <wheel>` step.
 - **Permission Errors:** Ensure the user running the application has write access to the `data/` and `logs/` directories.

@@ -7,13 +7,13 @@ from sqlalchemy.orm import Session
 from fastapi.templating import Jinja2Templates
 
 from ..i18n import get_text
+from ..core.paths import BASE_DIR
 from ..database import get_db, User, PageType
 from ..auth.service import verify_password, get_password_hash
 from ..auth.dependencies import get_current_user
 
 router = APIRouter(tags=[PageType.INFO])
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "src", "rateeye", "templates"))
 
 @router.get("/", response_class=HTMLResponse)
 async def read_root(request: Request, accept_language: str = Header(None), user: Optional[User] = Depends(get_current_user)):
@@ -68,6 +68,23 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
 @router.get("/logout")
 async def logout(request: Request):
     request.session.clear()
+    return RedirectResponse(url="/", status_code=303)
+
+@router.get("/change-password", response_class=HTMLResponse)
+async def change_password_page(request: Request, accept_language: str = Header(None), user: User = Depends(get_current_user)):
+    t = get_text(accept_language)
+    if not user: return RedirectResponse(url="/login", status_code=303)
+    return templates.TemplateResponse(request, "change_password.html", {"t": t, "user": user})
+
+@router.post("/change-password")
+async def change_password(request: Request, new_password: str = Form(...), confirm_password: str = Form(...), accept_language: str = Header(None), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    t = get_text(accept_language)
+    if not user: return RedirectResponse(url="/login", status_code=303)
+    if new_password != confirm_password:
+        return templates.TemplateResponse(request, "change_password.html", {"t": t, "user": user, "error": t.get("err_passwords_mismatch")})
+    user.hashed_password = get_password_hash(new_password)
+    user.force_password_change = False
+    db.commit()
     return RedirectResponse(url="/", status_code=303)
 
 @router.get("/about", response_class=HTMLResponse)

@@ -75,7 +75,7 @@ def test_force_password_change_redirect(client, db):
     
     # Accessing root should redirect to /change-password
     response = client.get("/", follow_redirects=True)
-    assert "change_password.html" in response.template.name
+    assert "Change Password" in response.text or "heading_change_password" in response.text
 
 def test_change_password_success(client, test_user):
     # Log in

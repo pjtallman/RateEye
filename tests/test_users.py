@@ -216,8 +216,9 @@ def test_admin_create_user(client, test_admin, db):
     assert user_role in new_user.roles
 
     # Verify initial password is username
-    from rateeye.main import verify_password
-    assert verify_password("newuser", new_user.hashed_password)
+    from rateeye.auth.service import verify_password
+    assert verify_password("newuser", new_user.hashed_password) is True
+
 
 def test_login_username_success(client, test_user, db):
     from rateeye.database import init_db

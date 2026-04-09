@@ -1,13 +1,9 @@
-milestone: "Milestone 8: Deployment validation and verification"
-branch: "feat/milestone-8-deployment"
-description: "Validate and verify deployment to a new server and access from outside this server."
+milestone: "Milestone 9 - Validate and verify deployment of v1.0.6 release"
+branch: "feat/milestone-9-VandV"
+description: "Validate and verify deployment of v1.0.6 release"
 issues:
-  - title: "Validate and verify deployment"
-    labels: ["feature", "milestone-8"]
+  - title: "Release v1.0.6 bug fixes and improvements"
+    labels: ["feature", "milestone-9"]
     description: |
-      Validate and verify deployment to a new server and access from outside this server.
-
-      ### Requirements:
-      - Sucessfully deploy RateEye from GitHub to a server.
-      - Validate RateEye has deployed accessing via WebBrowser from a separate computer.
+      Release v1.0.6 bug fixes and improvements:
     

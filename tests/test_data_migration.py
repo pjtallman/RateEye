@@ -86,10 +86,9 @@ def test_system_export_import(client, test_admin, db):
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["metadata"]["type"] == "system_config"
-    assert "log_lines" in payload["system_settings"]
-
+    assert "app_log_lines" in payload["system_settings"]
     # 3. Test Import
-    payload["system_settings"]["log_lines"] = "999"
+    payload["system_settings"]["app_log_lines"] = "999"
     file_content = json.dumps(payload).encode("utf-8")
     files = {"file": ("sys_import.json", BytesIO(file_content), "application/json")}
     
@@ -101,7 +100,7 @@ def test_system_export_import(client, test_admin, db):
     assert resp.status_code == 200
     
     # Verify change
-    setting = db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first()
+    setting = db.query(SystemSetting).filter(SystemSetting.name == "app_log_lines").first()
     assert setting.value == "999"
 
 def test_system_export_include_roles(client, test_admin, db):

@@ -24,15 +24,14 @@ def test_save_system_settings(client, test_admin, db):
     # Save settings
     response = client.post(
         "/settings/system",
-        data={"log_lines": "250"},
+        data={"app_log_lines": "250"},
         follow_redirects=True
     )
     assert response.status_code == 200
-    
-    # Verify in DB
-    setting = db.query(SystemSetting).filter(SystemSetting.name == "log_lines").first()
-    assert setting.value == "250"
 
+    # Verify in DB
+    setting = db.query(SystemSetting).filter(SystemSetting.name == "app_log_lines").first()
+    assert setting.value == "250"
 def test_show_log(client, test_admin):
     # Log in
     client.post(

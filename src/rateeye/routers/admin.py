@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from ..i18n import get_text
+from ..core.paths import BASE_DIR
 from ..database import (
     get_db, User, Security, Role, Permission, SystemSetting, PageType, 
     PermissionLevel, get_pages, SecurityType, AssetClass, get_system_setting
@@ -23,8 +24,7 @@ from ..security.service import check_page_permission
 from ..data_mgmt.export_import import get_activity_categories
 
 router = APIRouter(prefix="/admin", tags=[PageType.MAINTENANCE])
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "src", "rateeye", "templates"))
 logger = logging.getLogger(__name__)
 
 # --- USER MAINTENANCE ---
@@ -54,6 +54,14 @@ async def delete_user(user_id: int, user: User = Depends(login_required), db: Se
     if user.id == user_id: raise HTTPException(status_code=400, detail="Cannot delete yourself.")
     tu = db.query(User).filter(User.id == user_id).first()
     if tu: tu.roles = []; db.delete(tu); db.commit()
+    return RedirectResponse(url="/admin/users", status_code=303)
+
+@router.post("/users/force-password-change/{user_id}")
+async def force_password_change(user_id: int, db: Session = Depends(get_db)):
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if target_user:
+        target_user.force_password_change = True
+        db.commit()
     return RedirectResponse(url="/admin/users", status_code=303)
 
 # --- ROLE MAINTENANCE ---

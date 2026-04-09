@@ -3,13 +3,13 @@ import json
 import logging
 from sqlalchemy import inspect
 from ..database import PageType
+from .paths import BASE_DIR
 
 logger = logging.getLogger(__name__)
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 def load_metadata(activity_name: str, model_class=None) -> dict:
     """Loads metadata for a maintenance activity."""
-    metadata_dir = os.path.join(BASE_DIR, "metadata")
+    metadata_dir = os.path.join(BASE_DIR, "src", "rateeye", "metadata")
     paths = [
         os.path.join(metadata_dir, f"{activity_name}_maint_activity_metadata.json"),
         os.path.join(metadata_dir, f"{activity_name}.json")
