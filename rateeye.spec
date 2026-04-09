@@ -4,12 +4,13 @@ import sys
 
 block_cipher = None
 
-# We need to explicitly include all data folders from src/rateeye
+# We must preserve the 'src/rateeye' structure inside the bundle
+# because the code uses BASE_DIR/src/rateeye/...
 data_files = [
-    ('src/rateeye/static', 'rateeye/static'),
-    ('src/rateeye/templates', 'rateeye/templates'),
-    ('src/rateeye/locales', 'rateeye/locales'),
-    ('src/rateeye/metadata', 'rateeye/metadata'),
+    ('src/rateeye/static', 'src/rateeye/static'),
+    ('src/rateeye/templates', 'src/rateeye/templates'),
+    ('src/rateeye/locales', 'src/rateeye/locales'),
+    ('src/rateeye/metadata', 'src/rateeye/metadata'),
     ('VERSION', '.'),
     ('INSTALL_GUIDE.txt', '.'),
     ('COPYRIGHT.txt', '.'),
