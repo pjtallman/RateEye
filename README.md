@@ -1,3 +1,6 @@
+**RateEye** | Version: **1.0.7** | Copyright (c) 2026 Patrick James Tallman
+
+
 # RateEye
 
 RateEye is a high-performance yield tracking and security maintenance application built with FastAPI and TypeScript.

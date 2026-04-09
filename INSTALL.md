@@ -1,3 +1,6 @@
+**RateEye** | Version: **1.0.7** | Copyright (c) 2026 Patrick James Tallman
+
+
 # RateEye Installation Guide
 
 Thank you for choosing RateEye! This guide will help you get the application running on your computer in just a few minutes.

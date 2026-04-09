@@ -1,3 +1,6 @@
+**RateEye** | Version: **1.0.7** | Copyright (c) 2026 Patrick James Tallman
+
+
 # RateEye Deployment & Installation Guide
 
 This document provides detailed instructions for deploying RateEye in different environments, ranging from local development setups to professional production distributions.

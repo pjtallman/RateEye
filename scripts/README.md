@@ -1,3 +1,6 @@
+**RateEye** | Version: **1.0.7** | Copyright (c) 2026 Patrick James Tallman
+
+
 # RateEye Automation Scripts
 
 This folder contains scripts to automate the development lifecycle of RateEye, specifically for releasing versions and initializing new milestones.
@@ -48,14 +51,14 @@ The `release.py` script automates the final steps of a milestone: creating a Pul
    ```bash
    # On Mac/Linux:
    export PYTHONPATH=$PYTHONPATH:$(pwd)/src
-   .venv/bin/python scripts/release.py --version v1.0.5
+   .venv/bin/python scripts/release.py --version <version number>
 
    # On Windows:
    $env:PYTHONPATH += ";$(Get-Location)\src"
-   .venv\Scripts\python scripts/release.py --version v1.0.5
+   .venv\Scripts\python scripts/release.py --version <version number>
    ```
 
-   *(Replace `v1.0.5` with your target release tag)*.
+   *(Replace `<version number>` with your target release version, e.g., `v1.0.7`)*.
 3. **Action:**
    - The script will show a "Plan of Action".
    - Confirm with `y` to execute.

@@ -3,6 +3,7 @@ import subprocess
 import sys
 import os
 import json
+import glob
 
 def run(cmd, check=True, capture=True):
     """Executes a shell command and returns output or handles errors."""
@@ -36,10 +37,50 @@ def get_open_milestones(repo_full_name):
             pass
     return milestones
 
+def update_version_file(version):
+    """Updates the root VERSION file."""
+    # Remove 'v' prefix if present for the VERSION file content
+    clean_version = version.lstrip('v')
+    with open("VERSION", "w") as f:
+        f.write(clean_version + "\n")
+    print(f"[INFO] Updated VERSION file to {clean_version}")
+
+def update_markdown_headers(version):
+    """Updates the header of all markdown files in the project."""
+    header = f"**RateEye** | Version: **{version}** | Copyright (c) 2026 Patrick James Tallman\n\n"
+    md_files = glob.glob("**/*.md", recursive=True)
+    
+    for md_path in md_files:
+        if ".gemini" in md_path or "node_modules" in md_path or ".venv" in md_path:
+            continue
+            
+        with open(md_path, "r") as f:
+            content = f.read()
+            
+        # Check if header already exists (starts with **RateEye**)
+        if content.startswith("**RateEye**"):
+            # Replace existing header line
+            lines = content.splitlines(keepends=True)
+            if lines:
+                lines[0] = header
+                new_content = "".join(lines)
+            else:
+                new_content = header
+        else:
+            # Prepend header
+            new_content = header + content
+            
+        with open(md_path, "w") as f:
+            f.write(new_content)
+        print(f"[INFO] Updated header in {md_path}")
+
 def main():
     parser = argparse.ArgumentParser(description="RateEye Release Automation (Architect Version)")
     parser.add_argument("--version", required=True, help="Version to release (e.g., v1.0.5)")
     args = parser.parse_args()
+
+    # Normalize version: ensure it starts with 'v' for tagging/release
+    version = args.version if args.version.startswith('v') else f"v{args.version}"
 
     repo_name = get_repo_full_name()
     current_branch = get_current_branch()
@@ -76,17 +117,19 @@ def main():
     print("="*50)
     print(f"Repository:       {repo_name}")
     print(f"Current Branch:   {current_branch}")
-    print(f"Target Version:   {args.version}")
+    print(f"Target Version:   {version}")
     print(f"Closing Milestone: {selected_milestone['title'] if selected_milestone else 'None'}")
     print("-"*50)
     print("Steps to Execute:")
-    print(f"1. gh pr create --title \"Release {args.version}\" --body \"Merging {current_branch} to main\"")
-    print(f"2. gh pr merge --merge --delete-branch")
-    print(f"3. Local Cleanup: checkout main, pull, delete branch")
-    print(f"4. uv build")
-    print(f"5. gh release create {args.version} ./dist/*.whl --generate-notes")
+    print(f"1. Update VERSION file and Markdown headers locally")
+    print(f"2. Commit version changes to {current_branch}")
+    print(f"3. gh pr create --title \"Release {version}\" --body \"Merging {current_branch} to main\"")
+    print(f"4. gh pr merge --merge --delete-branch")
+    print(f"5. Local Cleanup: checkout main, pull, delete branch")
+    print(f"6. uv build")
+    print(f"7. gh release create {version} ./dist/*.whl --generate-notes")
     if selected_milestone:
-        print(f"6. Close Milestone: gh api --method PATCH repos/{repo_name}/milestones/{selected_milestone['number']} -f state=closed")
+        print(f"8. Close Milestone: gh api --method PATCH repos/{repo_name}/milestones/{selected_milestone['number']} -f state=closed")
     print("="*50 + "\n")
 
     confirm = input("Execute release? (y/n): ")
@@ -94,9 +137,17 @@ def main():
         print("[INFO] Release aborted.")
         sys.exit(0)
 
+    # 0. Update local files
+    print(f"[0/6] Updating local version files...")
+    update_version_file(version)
+    update_markdown_headers(version)
+    run(f"git add VERSION *.md **/ *.md") # Add all MD files and VERSION
+    run(f'git commit -m "Bump version to {version} and update headers"')
+    run(f"git push origin {current_branch}")
+
     # 1. PR
     print(f"[1/6] Creating Pull Request...")
-    run(f'gh pr create --title "Release {args.version}" --body "Merging {current_branch} to main"', check=False)
+    run(f'gh pr create --title "Release {version}" --body "Merging {current_branch} to main"', check=False)
 
     # 2. Merge
     print(f"[2/6] Merging Pull Request...")
@@ -108,7 +159,7 @@ def main():
     run("git pull origin main")
     run(f"git branch -d {current_branch}", check=False)
 
-    # 3.5 Sync Version
+    # 3.5 Sync Version (ensure backend reflects new VERSION)
     print(f"[3.5/6] Synchronizing version from VERSION file...")
     run(f"{sys.executable} scripts/sync_version.py")
 
@@ -120,8 +171,8 @@ def main():
     run("uv build")
 
     # 5. Release
-    print(f"[5/6] Creating GitHub Release {args.version}...")
-    run(f"gh release create {args.version} ./dist/*.whl --generate-notes")
+    print(f"[5/6] Creating GitHub Release {version}...")
+    run(f"gh release create {version} ./dist/*.whl --generate-notes")
 
     # 6. Milestone
     if selected_milestone:
@@ -130,7 +181,7 @@ def main():
     else:
         print("[6/6] No milestone selected to close.")
 
-    print(f"\n[SUCCESS] Release {args.version} completed successfully.")
+    print(f"\n[SUCCESS] Release {version} completed successfully.")
 
 if __name__ == "__main__":
     main()
