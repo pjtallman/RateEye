@@ -81,8 +81,8 @@ python3 -m build
 
 ### Step 3: Distribution Analysis
 The build process generates a `dist/` folder containing:
-- `rateeye-1.0.5.tar.gz` (Source Distribution)
-- `rateeye-1.0.5-py3-none-any.whl` (Binary Wheel)
+- `rateeye-1.0.7.tar.gz` (Source Distribution)
+- `rateeye-1.0.7-py3-none-any.whl` (Binary Wheel)
 
 **Exclusion Verification:** Because we use `Hatchling` with the configurations in `pyproject.toml`, the following items are **excluded** from these files:
 - `scripts/` folder (Release and Milestone scripts)
@@ -98,7 +98,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 # Install the built wheel
-pip install rateeye-1.0.5-py3-none-any.whl
+pip install rateeye-1.0.7-py3-none-any.whl
 ```
 
 ### Step 5: Run in Production
